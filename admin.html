@@ -1,17 +1,23 @@
-<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin</title><script src="https://cdn.tailwindcss.com"></script></head>
-<body class="bg-black text-white p-6"><div class="max-w-3xl mx-auto">
-<h1 class="text-3xl font-black text-yellow-400">VIPDRIVE ADMIN</h1><div id="stats" class="grid grid-cols-3 gap-3 mt-6"></div><div id="viajes" class="mt-8 space-y-2"></div></div>
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin Choferes</title><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-black text-white p-4 max-w-md mx-auto">
+<h1 class="text-2xl font-black">REGISTRO ÚNICO CHOFERES</h1><p class="text-xs text-gray-400">Solo tú con contraseña</p>
+<input id="pass" type="password" placeholder="Contraseña: vip2026" class="w-full mt-4 p-3 rounded-xl bg-zinc-900 border">
+<div id="form" class="hidden mt-4 bg-zinc-900 rounded-2xl p-4 space-y-2">
+<input id="id" placeholder="WhatsApp ID Ej: 6691234567" class="w-full p-3 rounded-xl bg-black border">
+<input id="nombre" placeholder="Nombre completo" class="w-full p-3 rounded-xl bg-black border">
+<input id="auto" placeholder="Auto Ej: Versa Blanco 2020" class="w-full p-3 rounded-xl bg-black border">
+<input id="placas" placeholder="Placas" class="w-full p-3 rounded-xl bg-black border">
+<input id="foto" placeholder="Link foto" class="w-full p-3 rounded-xl bg-black border">
+<button id="crear" class="w-full bg-purple-600 py-3 rounded-xl font-black">CREAR CHOFER</button>
+<p id="status" class="text-xs text-center text-green-400"></p>
+<div id="lista" class="mt-4 space-y-2"></div>
+</div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, collection, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
 const app = initializeApp(firebaseConfig); const db = getFirestore(app);
-const q = query(collection(db, "viajes"), orderBy("fecha","desc"));
-onSnapshot(q, (snap)=>{
-  const viajes = snap.docs.map(d=> ({id:d.id, ...d.data()}));
-  document.getElementById('stats').innerHTML = `<div class="bg-zinc-900 p-4 rounded-2xl"><p class="text-2xl font-black">${viajes.length}</p><p class="text-xs text-gray-400">Totales</p></div><div class="bg-zinc-900 p-4 rounded-2xl"><p class="text-2xl font-black">${viajes.filter(v=>v.estado==='buscando').length}</p><p class="text-xs text-gray-400">Pendientes</p></div><div class="bg-zinc-900 p-4 rounded-2xl"><p class="text-2xl font-black">${viajes.filter(v=>v.estado!=='buscando').length}</p><p class="text-xs text-gray-400">Tomados</p></div>`;
-  document.getElementById('viajes').innerHTML = viajes.map(v=>`<div class="bg-zinc-900 p-3 rounded-xl text-sm flex justify-between"><span>${v.cliente} -> ${v.destino}</span><span class="${v.estado==='buscando'?'text-yellow-400':'text-green-400'}">${v.estado}</span></div>`).join('');
-});
+document.getElementById('pass').oninput=(e)=>{ if(e.target.value==='vip2026') document.getElementById('form').classList.remove('hidden'); };
+document.getElementById('crear').onclick=async()=>{ const id=document.getElementById('id').value, nombre=document.getElementById('nombre').value, auto=document.getElementById('auto').value, placas=document.getElementById('placas').value, foto=document.getElementById('foto').value; if(!id||!nombre) return alert('Falta ID'); await setDoc(doc(db,"choferes",id),{id,nombre,auto,placas,foto,aprobado:true,disponible:true,registro_unico:true,fecha_registro:serverTimestamp()}); document.getElementById('status').innerText='✅ Creado: chofer.html?id='+id; };
+onSnapshot(collection(db,"choferes"), snap=>{ document.getElementById('lista').innerHTML=snap.docs.map(d=>{ const c=d.data(); return `<div class="bg-black p-3 rounded-xl flex gap-2"><img src="${c.foto||'https://i.pravatar.cc/100?u='+c.id}" class="w-12 h-12 rounded-full"><div><p class="font-bold text-sm">${c.nombre}</p><p class="text-xs text-gray-400">${c.auto} • ID:${c.id}</p><p class="text-xs text-purple-400">chofer.html?id=${c.id}</p></div></div>`; }).join(''); });
 </script></body></html>
