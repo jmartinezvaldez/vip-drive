@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIPDRIVE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-black text-white p-4">
+    <div class="max-w-md mx-auto">
+        <h1 class="text-3xl font-bold text-yellow-400">VIPDRIVE</h1>
+        <input id="cliente" placeholder="Tu nombre"
+            class="w-full mt-4 p-3 rounded-xl bg-zinc-900 border border-zinc-700">
+        <input id="destino" placeholder="¿A dónde vas?"
+            class="w-full mt-3 p-3 rounded-xl bg-zinc-900 border border-zinc-700">
+        <button id="btn" class="w-full mt-6 bg-yellow-400 text-black font-bold py-4 rounded-xl">SOLICITAR</button>
+        <p id="status" class="mt-4 text-center text-sm"></p>
+    </div>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        const firebaseConfig = { apiKey: "PEGÁ_AQUÍ_TU_APIKEY", authDomain: "PEGÁ_AQUÍ", projectId: "PEGÁ_AQUÍ" };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        document.getElementById('btn').onclick = async () => {
+            const cliente = document.getElementById('cliente').value;
+            const destino = document.getElementById('destino').value;
+            if (!cliente || !destino) return alert('Llena todo');
+            document.getElementById('status').innerText = 'Enviando...';
+            await addDoc(collection(db, "viajes"), { cliente, destino, estado: 'buscando', fecha: serverTimestamp() });
+            document.getElementById('status').innerText = '✅ Enviado, un chofer te contactará';
+        }
+    </script>
+</body>
+
+</html>
