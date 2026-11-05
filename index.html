@@ -2,54 +2,38 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VIPDRIVE Mazatlán</title>
+<title>VIPDRIVE - Ruta Real</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<style>
-body{margin:0;font-family:system-ui} #map{height:100vh;width:100%}
-.bottom-sheet{position:fixed;bottom:0;left:0;right:0;background:white;border-radius:28px 28px 0 0;z-index:1000;padding:20px;box-shadow:0 -10px 40px rgba(0,0,0,.2)}
-.pill{position:absolute;background:white;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,.2);white-space:nowrap}
-</style>
+<style>#map{height:100vh;width:100%} .bottom-sheet{position:fixed;bottom:0;left:0;right:0;background:white;border-radius:28px 28px 0 0;z-index:1000;padding:20px;box-shadow:0 -10px 40px rgba(0,0,0,.2)}</style>
 </head>
 <body>
 <div id="map"></div>
+<button id="ubicar" class="fixed bottom-[280px] right-4 z-[1000] w-14 h-14 bg-white rounded-full shadow-xl flex items-center justify-center">🎯</button>
 
-<!-- TOP BAR COMO TU FOTO -->
-<div class="fixed top-4 left-4 right-4 z-[1000] flex justify-between">
-<button class="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center text-xl">☰</button>
-<div class="flex gap-2">
-<button id="modo" class="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center">🌙</button>
-</div>
-</div>
-<button id="ubicar" class="fixed bottom-[220px] right-4 z-[1000] w-14 h-14 bg-white rounded-full shadow-xl flex items-center justify-center text-2xl">🎯</button>
-
-<!-- BOTTOM SHEET COMO TU FOTO -->
 <div class="bottom-sheet">
 <div class="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
 <h1 class="text-[22px] font-black text-black">¿A dónde vas, Pasajero?</h1>
 
 <div class="mt-3 bg-gray-100 rounded-2xl flex items-center px-4 py-3">
-<span class="text-xl">🔍</span>
-<input id="destino" list="lugares" value="Monumento al Pescador" class="flex-1 bg-transparent outline-none ml-3 text-black font-bold" placeholder="Busca en Mazatlán">
+<span>🔍</span>
+<input id="destino" class="flex-1 bg-transparent outline-none ml-3 text-black font-bold" value="Monumento al Pescador" placeholder="Ej: Gran Acuario, Cobaes 36">
 <button id="clear" class="w-8 h-8 bg-gray-200 rounded-full">X</button>
 </div>
-<datalist id="lugares">
-<option value="Letras de Mazatlán"><option value="Gran Acuario Mazatlán"><option value="Monumento al Pescador"><option value="Malecón de Mazatlán"><option value="Olas Altas"><option value="Cerro del Creston - Faro Mazatlán"><option value="Walmart Ejercito Mexicano"><option value="Cobaes 36">
-</datalist>
 
 <div id="detalle" class="mt-4 border-t pt-3">
-<p class="text-xs font-black text-gray-500 tracking-widest">DETALLE DEL VIAJE</p>
-<div class="flex justify-between items-center mt-2">
-<div><p class="text-sm text-black">Tarifa <b class="text-purple-600">$10/km • Min $35</b></p><p id="km-info" class="text-xs text-gray-500"></p></div>
-<button id="solicitar" class="bg-black text-white px-6 py-3 rounded-full font-black">VIPDRIVE $35</button>
+<p class="text-xs font-black text-gray-500">DETALLE DEL VIAJE</p>
+<p class="text-sm text-black mt-2">Distancia real: <b id="dist-real">-- km</b> • Ruta: <b id="ruta-info">--</b></p>
+<p class="text-lg font-black text-black">Tarifa: <b id="tarifa-final" class="text-purple-600">$35 mínimo</b></p>
+<p class="text-xs text-gray-500">$10 por km • Mínimo $35 para viajes cortos</p>
+<div class="flex gap-2 mt-3">
+<input id="nombre" placeholder="Tu nombre" class="flex-1 p-3 bg-gray-100 rounded-xl text-sm text-black">
+<input id="tel" placeholder="WhatsApp" class="flex-1 p-3 bg-gray-100 rounded-xl text-sm text-black">
 </div>
-<div class="mt-3">
-<input id="nombre" placeholder="Tu nombre" class="w-1/2 p-2 bg-gray-100 rounded-xl text-sm text-black">
-<input id="tel" placeholder="WhatsApp" class="w-[48%] p-2 bg-gray-100 rounded-xl text-sm text-black">
-</div>
+<button id="solicitar" class="w-full mt-3 bg-black text-white py-4 rounded-full font-black text-lg">CALCULAR RUTA Y SOLICITAR</button>
 <p id="status" class="text-xs text-center mt-2 text-green-600"></p>
-<div id="viaje-vivo" class="hidden mt-2 bg-purple-50 border border-purple-200 rounded-xl p-2"><p id="km-cliente" class="text-black text-sm"></p><p id="tarifa-cliente" class="text-black font-black text-lg"></p></div>
+<div id="viaje-vivo" class="hidden mt-2 bg-purple-50 border border-purple-200 rounded-xl p-3"><p id="km-cliente" class="text-black text-sm"></p><p id="tarifa-cliente" class="text-black font-black text-lg"></p></div>
 </div>
 </div>
 
@@ -59,57 +43,86 @@ import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "h
 const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
 const app = initializeApp(firebaseConfig); const db = getFirestore(app);
 
-let myLat=23.2329, myLng=-106.4062, map, myMarker, carMarkers={}, routeLine, miViajeId=null;
+let myLat=23.2329, myLng=-106.4062, destLat=23.223, destLng=-106.416, map, myMarker, routeLine, miViajeId=null, distanciaReal=0;
 map = L.map('map', {zoomControl:false}).setView([myLat, myLng], 14);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 function calcTarifa(km){ return Math.max(35, Math.round(km*10)); }
 
-// Puntos de Mazatlán como tu foto
-const puntos = [
-{ n:"Walmart Ejército Mexicano", lat:23.249, lng:-106.41, color:"blue"},
-{ n:"Letras de Mazatlán", lat:23.246, lng:-106.425, color:"purple"},
-{ n:"Gran Acuario Mazatlán", lat:23.239, lng:-106.42, color:"purple"},
-{ n:"La Jalba Pata Salada", lat:23.232, lng:-106.418, color:"orange"},
-{ n:"Monumento al Pescador", lat:23.223, lng:-106.416, color:"purple"},
-{ n:"Malecón de Mazatlán", lat:23.213, lng:-106.416, color:"purple"},
-{ n:"Olas Altas", lat:23.205, lng:-106.412, color:"green"},
-{ n:"Cerro del Crestón - Faro", lat:23.19, lng:-106.42, color:"purple"},
-];
-const rutaCoords = puntos.map(p=>[p.lat,p.lng]);
-L.polyline(rutaCoords, {color:'#8B5CF6', weight:8, opacity:0.9}).addTo(map);
-puntos.forEach(p=>{ L.marker([p.lat,p.lng]).addTo(map).bindTooltip(p.n, {permanent:false}); });
+async function geocodeDestino(texto){
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(texto + ' Mazatlán Sinaloa')}&limit=1`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if(data.length>0){ return {lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon)}; }
+  }catch(e){}
+  return null;
+}
 
-navigator.geolocation.getCurrentPosition(pos=>{ myLat=pos.coords.latitude; myLng=pos.coords.longitude; map.setView([myLat,myLng],14); myMarker=L.marker([myLat,myLng]).addTo(map).bindPopup("Tú"); });
+async function calcularRutaReal(){
+  const destinoTexto = document.getElementById('destino').value;
+  if(!destinoTexto) return;
+  document.getElementById('ruta-info').innerText = 'Calculando...';
+  
+  let dCoords = await geocodeDestino(destinoTexto);
+  if(!dCoords){
+    // si no encuentra, usa puntos predefinidos de tu foto
+    const puntos = {"Monumento al Pescador":[23.223,-106.416],"Gran Acuario Mazatlán":[23.239,-106.42],"Letras de Mazatlán":[23.246,-106.425],"Malecón de Mazatlán":[23.213,-106.416],"Olas Altas":[23.205,-106.412],"Cerro del Crestón - Faro Mazatlán":[23.19,-106.42],"Walmart":[23.249,-106.41],"Cobaes 36":[23.22,-106.38]};
+    for(let k in puntos){ if(destinoTexto.toLowerCase().includes(k.toLowerCase().split(' ')[0])){ dCoords={lat:puntos[k][0], lng:puntos[k][1]}; break; } }
+    if(!dCoords) dCoords={lat:23.223, lng:-106.416};
+  }
+  destLat=dCoords.lat; destLng=dCoords.lng;
+  
+  try{
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${myLng},${myLat};${destLng},${destLat}?overview=full&geometries=geojson`;
+    const r = await fetch(osrmUrl);
+    const j = await r.json();
+    if(j.routes && j.routes.length>0){
+      distanciaReal = j.routes[0].distance/1000; // km
+      const coords = j.routes[0].geometry.coordinates.map(c=>[c[1], c[0]]);
+      if(routeLine) map.removeLayer(routeLine);
+      routeLine = L.polyline(coords, {color:'#8B5CF6', weight:7, opacity:0.9}).addTo(map);
+      map.fitBounds(routeLine.getBounds(), {padding:[100,100]});
+      
+      document.getElementById('dist-real').innerText = distanciaReal.toFixed(2)+' km';
+      document.getElementById('ruta-info').innerText = `${(j.routes[0].duration/60).toFixed(0)} min`;
+      const tarifa = calcTarifa(distanciaReal);
+      document.getElementById('tarifa-final').innerText = `$${tarifa} ${distanciaReal*10<35?'(mín $35)':''}`;
+      document.getElementById('solicitar').innerText = `SOLICITAR POR $${tarifa}`;
+      return {km: distanciaReal, tarifa: tarifa, ruta: coords};
+    }
+  }catch(e){
+    console.log(e);
+  }
+  document.getElementById('ruta-info').innerText='Ruta estimada';
+  return null;
+}
 
-document.getElementById('ubicar').onclick=()=>{ navigator.geolocation.getCurrentPosition(p=>{ map.setView([p.coords.latitude,p.coords.longitude],15); }); };
+document.getElementById('destino').addEventListener('change', calcularRutaReal);
+document.getElementById('destino').addEventListener('blur', calcularRutaReal);
 document.getElementById('clear').onclick=()=>{ document.getElementById('destino').value=''; };
-document.getElementById('destino').oninput=()=>{ const d=document.getElementById('destino').value; const p=puntos.find(x=>d.includes(x.n.split(' ')[0])); if(p){ map.setView([p.lat,p.lng],15); document.getElementById('km-info').innerText=`Destino: ${p.n}`; document.getElementById('solicitar').innerText=`VIPDRIVE $35`; } };
+document.getElementById('ubicar').onclick=()=>{ navigator.geolocation.getCurrentPosition(p=>{ myLat=p.coords.latitude; myLng=p.coords.longitude; map.setView([myLat,myLng],15); calcularRutaReal(); }); };
 
-onSnapshot(collection(db, "choferes"), snap=>{
-  snap.docs.forEach(d=>{
-    const c=d.data(); if(!c.lat) return;
-    if(carMarkers[c.id]) map.removeLayer(carMarkers[c.id]);
-    const icon = L.divIcon({html:"<div style='background:black;border:2px solid #8B5CF6;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:white'>🚗</div>", iconSize:[32,32]});
-    carMarkers[c.id]=L.marker([c.lat,c.lng],{icon}).addTo(map);
-  });
-});
+navigator.geolocation.getCurrentPosition(p=>{ myLat=p.coords.latitude; myLng=p.coords.longitude; map.setView([myLat,myLng],14); L.marker([myLat,myLng]).addTo(map).bindPopup("Tú"); calcularRutaReal(); }, ()=>{ calcularRutaReal(); });
+
+document.getElementById('solicitar').onclick=async()=>{
+  const infoRuta = await calcularRutaReal();
+  if(!infoRuta){ alert('No se pudo calcular ruta, intenta otro destino'); return; }
+  const cliente=document.getElementById('nombre').value||'Pasajero', tel=document.getElementById('tel').value, destino=document.getElementById('destino').value;
+  const ref = await addDoc(collection(db, "viajes"), { cliente, destino, telefono: tel, km: infoRuta.km, tarifa_final: infoRuta.tarifa, tarifa_por_km:10, tarifa_minima:35, lat: myLat, lng: myLng, dest_lat: destLat, dest_lng: destLng, ruta: infoRuta.ruta, estado:'buscando', fecha: serverTimestamp() });
+  miViajeId=ref.id; document.getElementById('status').innerText=`✅ Solicitado: ${infoRuta.km.toFixed(2)}km = $${infoRuta.tarifa}`;
+};
 
 onSnapshot(collection(db, "viajes"), snap=>{
   snap.docs.forEach(d=>{
-    const v=d.data(); if(miViajeId && d.id===miViajeId){
-      if(v.ruta){ if(routeLine) map.removeLayer(routeLine); routeLine=L.polyline(v.ruta,{color:'#8B5CF6',weight:6}).addTo(map); }
-      if(v.km!==undefined){ document.getElementById('viaje-vivo').classList.remove('hidden'); document.getElementById('km-cliente').innerText=`Recorrido: ${v.km.toFixed(2)} km`; document.getElementById('tarifa-cliente').innerText=`$${calcTarifa(v.km)} ${v.km*10<35?'(mín $35)':''}`; if(v.estado==='finalizado'){ document.getElementById('status').innerText=`Finalizado: $${v.tarifa_final}`; } }
+    const v=d.data(); if(miViajeId && d.id===miViajeId && v.km){
+      document.getElementById('viaje-vivo').classList.remove('hidden');
+      document.getElementById('km-cliente').innerText=`Recorrido: ${v.km.toFixed(2)} km`;
+      document.getElementById('tarifa-cliente').innerText=`$${calcTarifa(v.km)}`;
+      if(v.estado==='finalizado'){ document.getElementById('status').innerText=`Finalizado: $${v.tarifa_final} por ${v.km.toFixed(2)}km`; }
     }
   });
 });
-
-document.getElementById('solicitar').onclick=async()=>{
-  const cliente=document.getElementById('nombre').value||'Pasajero', destino=document.getElementById('destino').value, tel=document.getElementById('tel').value;
-  if(!destino) return alert('¿A dónde vas?');
-  const ref = await addDoc(collection(db, "viajes"), { cliente, destino, telefono: tel, tarifa_por_km:10, tarifa_minima:35, lat: myLat, lng: myLng, estado:'buscando', fecha: serverTimestamp() });
-  miViajeId=ref.id; document.getElementById('status').innerText='✅ Solicitado $10/km Min $35 - Choferes te ven';
-};
 </script>
 </body>
 </html>
