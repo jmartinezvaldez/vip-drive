@@ -1,22 +1,21 @@
-<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Chofer</title><script src="https://cdn.tailwindcss.com"></script></head>
-<body class="bg-zinc-950 text-white p-4"><div class="max-w-md mx-auto">
-<h1 class="text-2xl font-black">CHOFER VIPDRIVE</h1><p id="choferId" class="text-yellow-400"></p><div id="lista" class="mt-6 space-y-3">Cargando...</div></div>
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Chofer $10/km Min $35</title><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>#map{height:50vh}</style></head>
+<body class="bg-zinc-950 text-white"><div class="max-w-md mx-auto"><div id="map"></div><div class="p-4">
+<h1 class="font-black text-xl">CHOFER $10/KM MIN $35</h1><p id="miId" class="text-purple-400 text-xs"></p>
+<div id="viaje-activo" class="hidden bg-purple-600 text-white rounded-2xl p-4 mt-3"><p class="font-black">VIAJE EN CURSO</p><p id="cliente-activo"></p><p class="text-sm mt-1">Distancia: <b id="km">0.00 km</b> | Tarifa: <b id="tarifa">$35</b> (Min $35)</p><button id="finalizar" class="w-full mt-3 bg-white text-purple-600 font-black py-3 rounded-xl">FINALIZAR VIAJE</button></div>
+<div class="bg-zinc-900 rounded-2xl p-3 mt-3"><input id="nombre" placeholder="Nombre" class="w-full p-2 rounded-lg bg-black border border-zinc-700 text-sm"><input id="auto" placeholder="Auto" class="w-full mt-1 p-2 rounded-lg bg-black border border-zinc-700 text-sm"><input id="foto" placeholder="Link foto perfil" class="w-full mt-1 p-2 rounded-lg bg-black border border-zinc-700 text-sm"><button id="guardar" class="w-full mt-2 bg-white text-black font-bold py-2 rounded-lg text-sm">Activar GPS</button></div>
+<h2 class="font-bold mt-4 text-sm">Solicitudes</h2><div id="lista" class="mt-2 space-y-2 pb-24"></div></div></div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, query, orderBy, onSnapshot, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, query, orderBy, onSnapshot, doc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
 const app = initializeApp(firebaseConfig); const db = getFirestore(app);
-const miId = new URLSearchParams(location.search).get('id')||'chofer1';
-document.getElementById('choferId').innerText=miId;
-const q = query(collection(db, "viajes"), orderBy("fecha","desc"));
-onSnapshot(q, (snap)=>{
-  const viajes = snap.docs.filter(d=> d.data().estado==='buscando');
-  document.getElementById('lista').innerHTML = viajes.length===0 ? '<p class=text-gray-500>No hay solicitudes</p>' : viajes.map(d=>{
-    const v=d.data();
-    return `<div class="bg-zinc-900 p-4 rounded-2xl"><p class="font-bold">${v.cliente} -> ${v.destino}</p><p class="text-xs text-gray-400">${v.telefono||''}</p><div class="flex gap-2 mt-3"><a href="https://wa.me/52${v.telefono}?text=Hola ${v.cliente}" class="flex-1 bg-green-500 text-black text-center py-3 rounded-xl font-black">WhatsApp</a><button data-id="${d.id}" class="tomar flex-1 bg-yellow-400 text-black py-3 rounded-xl font-black">TOMAR</button></div></div>`;
-  }).join('');
-  document.querySelectorAll('.tomar').forEach(b=> b.onclick=async()=>{ await updateDoc(doc(db, "viajes", b.dataset.id), {estado:'tomado por '+miId, chofer:miId}); });
-});
+const miId = new URLSearchParams(location.search).get('id')||'6691234567'; document.getElementById('miId').innerText='ID: '+miId;
+let map = L.map('map').setView([23.2329, -106.4062], 13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+let myMarker, routeLine, puntos=[], distanciaTotal=0, viajeId=null, lastPos=null;
+function haversine(a,b,c,d){const R=6371, dLat=(c-a)*Math.PI/180, dLon=(d-b)*Math.PI/180, e=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(e),Math.sqrt(1-e));}
+function calcTarifa(km){ return Math.max(35, Math.round(km*10)); }
+async function activar(){ navigator.geolocation.watchPosition(async pos=>{ const lat=pos.coords.latitude, lng=pos.coords.longitude; map.setView([lat,lng],15); if(myMarker) map.removeLayer(myMarker); myMarker=L.marker([lat,lng]).addTo(map); await setDoc(doc(db,"choferes",miId),{id:miId, lat, lng, disponible: viajeId?false:true, lastUpdate: serverTimestamp(), nombre: document.getElementById('nombre').value||'Chofer', auto: document.getElementById('auto').value||'', foto: document.getElementById('foto').value||''},{merge:true}); if(viajeId){ if(lastPos){ const d=haversine(lastPos.lat,lastPos.lng,lat,lng); if(d>0.02){ distanciaTotal+=d; puntos.push([lat,lng]); if(routeLine) map.removeLayer(routeLine); routeLine=L.polyline(puntos,{color:'#8B5CF6',weight:6}).addTo(map); document.getElementById('km').innerText=distanciaTotal.toFixed(2)+' km'; document.getElementById('tarifa').innerText='$'+calcTarifa(distanciaTotal); await updateDoc(doc(db,"viajes",viajeId),{km:distanciaTotal,tarifa_final:calcTarifa(distanciaTotal),ruta:puntos,estado:'en curso'}); }} else { puntos=[[lat,lng]];} lastPos={lat,lng}; }}, null,{enableHighAccuracy:true}); }
+document.getElementById('guardar').onclick=activar; activar();
+onSnapshot(query(collection(db,"viajes"),orderBy("fecha","desc")), snap=>{ const viajes=snap.docs.filter(d=>d.data().estado==='buscando'); if(viajeId) return; document.getElementById('lista').innerHTML=viajes.map(d=>{ const v=d.data(); return `<div class="bg-zinc-900 p-3 rounded-2xl"><p class="font-bold text-sm">${v.cliente} -> ${v.destino}</p><p class="text-xs text-gray-400">${v.telefono||''} • Min $35</p><button data-id="${d.id}" data-cliente="${v.cliente}" class="tomar w-full mt-2 bg-purple-600 text-white py-2 rounded-xl font-black text-sm">TOMAR $10/km MIN $35</button></div>`;}).join(''); document.querySelectorAll('.tomar').forEach(b=> b.onclick=async()=>{ viajeId=b.dataset.id; distanciaTotal=0; puntos=[]; lastPos=null; document.getElementById('viaje-activo').classList.remove('hidden'); document.getElementById('cliente-activo').innerText=b.dataset.cliente; document.getElementById('lista').innerHTML='<p>En curso...</p>'; await updateDoc(doc(db,"viajes",viajeId),{estado:'en curso', chofer:miId, km:0, tarifa_final:35, inicio: serverTimestamp()}); }); });
+document.getElementById('finalizar').onclick=async()=>{ if(!viajeId) return; await updateDoc(doc(db,"viajes",viajeId),{estado:'finalizado', km:distanciaTotal, tarifa_final:calcTarifa(distanciaTotal), fin: serverTimestamp()}); alert(`Finalizado: ${distanciaTotal.toFixed(2)} km = $${calcTarifa(distanciaTotal)}`); viajeId=null; puntos=[]; distanciaTotal=0; if(routeLine){ map.removeLayer(routeLine); routeLine=null;} document.getElementById('viaje-activo').classList.add('hidden'); };
 </script></body></html>
