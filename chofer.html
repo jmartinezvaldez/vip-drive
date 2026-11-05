@@ -1,21 +1,153 @@
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Chofer $10/km Min $35</title><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>#map{height:50vh}</style></head>
-<body class="bg-zinc-950 text-white"><div class="max-w-md mx-auto"><div id="map"></div><div class="p-4">
-<h1 class="font-black text-xl">CHOFER $10/KM MIN $35</h1><p id="miId" class="text-purple-400 text-xs"></p>
-<div id="viaje-activo" class="hidden bg-purple-600 text-white rounded-2xl p-4 mt-3"><p class="font-black">VIAJE EN CURSO</p><p id="cliente-activo"></p><p class="text-sm mt-1">Distancia: <b id="km">0.00 km</b> | Tarifa: <b id="tarifa">$35</b> (Min $35)</p><button id="finalizar" class="w-full mt-3 bg-white text-purple-600 font-black py-3 rounded-xl">FINALIZAR VIAJE</button></div>
-<div class="bg-zinc-900 rounded-2xl p-3 mt-3"><input id="nombre" placeholder="Nombre" class="w-full p-2 rounded-lg bg-black border border-zinc-700 text-sm"><input id="auto" placeholder="Auto" class="w-full mt-1 p-2 rounded-lg bg-black border border-zinc-700 text-sm"><input id="foto" placeholder="Link foto perfil" class="w-full mt-1 p-2 rounded-lg bg-black border border-zinc-700 text-sm"><button id="guardar" class="w-full mt-2 bg-white text-black font-bold py-2 rounded-lg text-sm">Activar GPS</button></div>
-<h2 class="font-bold mt-4 text-sm">Solicitudes</h2><div id="lista" class="mt-2 space-y-2 pb-24"></div></div></div>
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chofer VIPDRIVE - Ruta Real $10/km</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>#map{height:55vh}</style>
+</head>
+<body class="bg-zinc-950 text-white">
+<div class="max-w-md mx-auto">
+<div id="map"></div>
+<div class="p-4">
+<h1 class="font-black text-xl">CHOFER $10/KM MIN $35</h1>
+<p id="miId" class="text-purple-400 text-xs"></p>
+
+<div id="viaje-activo" class="hidden bg-purple-600 text-white rounded-2xl p-4 mt-3">
+<p class="font-black">VIAJE EN CURSO</p>
+<p id="cliente-activo" class="font-bold"></p>
+<p id="destino-activo" class="text-xs opacity-80"></p>
+<p class="text-sm mt-2">Ruta real: <b id="km-ruta">-- km</b> | Tarifa: <b id="tarifa-ruta">$35</b></p>
+<p class="text-xs mt-1">Recorrido GPS: <b id="km-gps">0.00 km</b> | Total a cobrar: <b id="tarifa-total">$35</b></p>
+<div class="w-full bg-black/20 rounded-full h-2 mt-2"><div id="barra" class="bg-white h-2 rounded-full" style="width:0%"></div></div>
+<button id="finalizar" class="w-full mt-3 bg-white text-purple-600 font-black py-3 rounded-xl">FINALIZAR VIAJE</button>
+</div>
+
+<div class="bg-zinc-900 rounded-2xl p-3 mt-3">
+<input id="nombre" placeholder="Tu nombre" class="w-full p-2 rounded-lg bg-black border border-zinc-700 text-sm">
+<input id="auto" placeholder="Auto Ej: Versa Blanco" class="w-full mt-1 p-2 rounded-lg bg-black border border-zinc-700 text-sm">
+<input id="foto" placeholder="Link foto perfil" class="w-full mt-1 p-2 rounded-lg bg-black border border-zinc-700 text-sm">
+<button id="guardar" class="w-full mt-2 bg-white text-black font-bold py-2 rounded-lg text-sm">ACTIVAR GPS Y RUTA REAL</button>
+<p id="estado" class="text-xs text-green-400 mt-2">● Calculando rutas reales por calles</p>
+</div>
+
+<h2 class="font-bold mt-4 text-sm">Solicitudes con tarifa real</h2>
+<div id="lista" class="mt-2 space-y-2 pb-24"></div>
+</div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, query, orderBy, onSnapshot, doc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
 const app = initializeApp(firebaseConfig); const db = getFirestore(app);
-const miId = new URLSearchParams(location.search).get('id')||'6691234567'; document.getElementById('miId').innerText='ID: '+miId;
-let map = L.map('map').setView([23.2329, -106.4062], 13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-let myMarker, routeLine, puntos=[], distanciaTotal=0, viajeId=null, lastPos=null;
-function haversine(a,b,c,d){const R=6371, dLat=(c-a)*Math.PI/180, dLon=(d-b)*Math.PI/180, e=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(e),Math.sqrt(1-e));}
+
+const miId = new URLSearchParams(location.search).get('id')||'6691234567';
+document.getElementById('miId').innerText='ID: '+miId;
+
+let map = L.map('map').setView([23.2329, -106.4062], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+let myMarker, routeLine, gpsLine, puntosGPS=[], distanciaGPS=0, viajeId=null, lastPos=null, viajeActual=null, kmRutaReal=0;
+
+function haversine(lat1,lon1,lat2,lon2){ const R=6371; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180; const a=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); }
 function calcTarifa(km){ return Math.max(35, Math.round(km*10)); }
-async function activar(){ navigator.geolocation.watchPosition(async pos=>{ const lat=pos.coords.latitude, lng=pos.coords.longitude; map.setView([lat,lng],15); if(myMarker) map.removeLayer(myMarker); myMarker=L.marker([lat,lng]).addTo(map); await setDoc(doc(db,"choferes",miId),{id:miId, lat, lng, disponible: viajeId?false:true, lastUpdate: serverTimestamp(), nombre: document.getElementById('nombre').value||'Chofer', auto: document.getElementById('auto').value||'', foto: document.getElementById('foto').value||''},{merge:true}); if(viajeId){ if(lastPos){ const d=haversine(lastPos.lat,lastPos.lng,lat,lng); if(d>0.02){ distanciaTotal+=d; puntos.push([lat,lng]); if(routeLine) map.removeLayer(routeLine); routeLine=L.polyline(puntos,{color:'#8B5CF6',weight:6}).addTo(map); document.getElementById('km').innerText=distanciaTotal.toFixed(2)+' km'; document.getElementById('tarifa').innerText='$'+calcTarifa(distanciaTotal); await updateDoc(doc(db,"viajes",viajeId),{km:distanciaTotal,tarifa_final:calcTarifa(distanciaTotal),ruta:puntos,estado:'en curso'}); }} else { puntos=[[lat,lng]];} lastPos={lat,lng}; }}, null,{enableHighAccuracy:true}); }
-document.getElementById('guardar').onclick=activar; activar();
-onSnapshot(query(collection(db,"viajes"),orderBy("fecha","desc")), snap=>{ const viajes=snap.docs.filter(d=>d.data().estado==='buscando'); if(viajeId) return; document.getElementById('lista').innerHTML=viajes.map(d=>{ const v=d.data(); return `<div class="bg-zinc-900 p-3 rounded-2xl"><p class="font-bold text-sm">${v.cliente} -> ${v.destino}</p><p class="text-xs text-gray-400">${v.telefono||''} • Min $35</p><button data-id="${d.id}" data-cliente="${v.cliente}" class="tomar w-full mt-2 bg-purple-600 text-white py-2 rounded-xl font-black text-sm">TOMAR $10/km MIN $35</button></div>`;}).join(''); document.querySelectorAll('.tomar').forEach(b=> b.onclick=async()=>{ viajeId=b.dataset.id; distanciaTotal=0; puntos=[]; lastPos=null; document.getElementById('viaje-activo').classList.remove('hidden'); document.getElementById('cliente-activo').innerText=b.dataset.cliente; document.getElementById('lista').innerHTML='<p>En curso...</p>'; await updateDoc(doc(db,"viajes",viajeId),{estado:'en curso', chofer:miId, km:0, tarifa_final:35, inicio: serverTimestamp()}); }); });
-document.getElementById('finalizar').onclick=async()=>{ if(!viajeId) return; await updateDoc(doc(db,"viajes",viajeId),{estado:'finalizado', km:distanciaTotal, tarifa_final:calcTarifa(distanciaTotal), fin: serverTimestamp()}); alert(`Finalizado: ${distanciaTotal.toFixed(2)} km = $${calcTarifa(distanciaTotal)}`); viajeId=null; puntos=[]; distanciaTotal=0; if(routeLine){ map.removeLayer(routeLine); routeLine=null;} document.getElementById('viaje-activo').classList.add('hidden'); };
-</script></body></html>
+
+async function trazarRutaReal(lat1,lng1,lat2,lng2){
+  try{
+    const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson`;
+    const r = await fetch(url);
+    const j = await r.json();
+    if(j.routes && j.routes[0]){
+      kmRutaReal = j.routes[0].distance/1000;
+      const coords = j.routes[0].geometry.coordinates.map(c=>[c[1], c[0]]);
+      if(routeLine) map.removeLayer(routeLine);
+      routeLine = L.polyline(coords, {color:'#8B5CF6', weight:8}).addTo(map);
+      map.fitBounds(routeLine.getBounds(), {padding:[50,50]});
+      document.getElementById('km-ruta').innerText = kmRutaReal.toFixed(2)+' km';
+      document.getElementById('tarifa-ruta').innerText = '$'+calcTarifa(kmRutaReal);
+      actualizarTotal();
+      return {km: kmRutaReal, coords: coords};
+    }
+  }catch(e){ console.log(e); }
+  return null;
+}
+
+function actualizarTotal(){
+  const kmTotal = Math.max(kmRutaReal, distanciaGPS);
+  const tarifa = calcTarifa(kmTotal);
+  document.getElementById('km-gps').innerText = distanciaGPS.toFixed(2)+' km';
+  document.getElementById('tarifa-total').innerText = '$'+tarifa;
+  document.getElementById('barra').style.width = Math.min(100, kmTotal*8)+'%';
+  if(viajeId){ updateDoc(doc(db, "viajes", viajeId), { km_real: kmRutaReal, km_gps: distanciaGPS, km: kmTotal, tarifa_final: tarifa, ruta_real: routeLine?routeLine.getLatLngs():[], ruta_gps: puntosGPS }); }
+}
+
+async function activar(){
+  navigator.geolocation.watchPosition(async pos=>{
+    const lat=pos.coords.latitude, lng=pos.coords.longitude;
+    map.setView([lat,lng], 15);
+    if(myMarker) map.removeLayer(myMarker);
+    myMarker = L.marker([lat,lng]).addTo(map).bindPopup('Tú - Chofer');
+    await setDoc(doc(db, "choferes", miId), { id: miId, lat, lng, disponible: viajeId?false:true, lastUpdate: serverTimestamp(), nombre: document.getElementById('nombre').value||'Chofer', auto: document.getElementById('auto').value||'', foto: document.getElementById('foto').value||'' }, {merge:true});
+    
+    if(viajeId && lastPos){
+      const d = haversine(lastPos.lat, lastPos.lng, lat, lng);
+      if(d>0.02){
+        distanciaGPS+=d;
+        puntosGPS.push([lat,lng]);
+        if(gpsLine) map.removeLayer(gpsLine);
+        gpsLine = L.polyline(puntosGPS, {color:'yellow', weight:4, dashArray:'10,10'}).addTo(map);
+        actualizarTotal();
+      }
+    }
+    if(viajeId && !lastPos){ puntosGPS=[[lat,lng]]; }
+    lastPos={lat,lng};
+  }, null, {enableHighAccuracy:true});
+}
+document.getElementById('guardar').onclick=activar;
+activar();
+
+onSnapshot(query(collection(db, "viajes"), orderBy("fecha","desc")), snap=>{
+  const viajes = snap.docs.filter(d=>d.data().estado==='buscando');
+  if(viajeId) return;
+  document.getElementById('lista').innerHTML = viajes.map(d=>{
+    const v=d.data();
+    const km = v.km? v.km.toFixed(2) : '--';
+    const tarifa = v.tarifa_final? '$'+v.tarifa_final : '$35 min';
+    return `<div class="bg-zinc-900 p-3 rounded-2xl"><p class="font-bold text-sm">${v.cliente} -> ${v.destino}</p><p class="text-xs text-gray-400">${km} km • Tarifa real: ${tarifa} • $10/km Min $35</p><p class="text-xs text-gray-500">${v.telefono||''}</p><button data-id="${d.id}" data-cliente="${v.cliente}" data-dest="${v.destino}" data-lat="${v.dest_lat||''}" data-lng="${v.dest_lng||''}" data-clat="${v.lat}" data-clng="${v.lng}" class="tomar w-full mt-2 bg-purple-600 text-white py-2 rounded-xl font-black text-sm">TOMAR - TRAZAR RUTA REAL</button></div>`;
+  }).join('');
+  
+  document.querySelectorAll('.tomar').forEach(b=> b.onclick=async()=>{
+    viajeId=b.dataset.id;
+    viajeActual={clat: parseFloat(b.dataset.clat), clng: parseFloat(b.dataset.clng), dlat: parseFloat(b.dataset.lat), dlng: parseFloat(b.dataset.lng)};
+    distanciaGPS=0; puntosGPS=[]; lastPos=null; kmRutaReal=0;
+    document.getElementById('viaje-activo').classList.remove('hidden');
+    document.getElementById('cliente-activo').innerText=b.dataset.cliente;
+    document.getElementById('destino-activo').innerText=b.dataset.dest;
+    document.getElementById('lista').innerHTML='<p class=text-gray-500>Trazando ruta real por calles...</p>';
+    
+    // Si tiene coords de destino, traza ruta real
+    if(viajeActual.dlat && viajeActual.dlng){
+      await trazarRutaReal(viajeActual.clat, viajeActual.clng, viajeActual.dlat, viajeActual.dlng);
+    } else if(viajeActual.clat){
+      await trazarRutaReal(lastPos.lat, lastPos.lng, viajeActual.clat, viajeActual.clng);
+    }
+    
+    await updateDoc(doc(db, "viajes", viajeId), {estado:'en curso', chofer: miId, inicio: serverTimestamp(), km_real: kmRutaReal, tarifa_final: calcTarifa(kmRutaReal)});
+  });
+});
+
+document.getElementById('finalizar').onclick=async()=>{
+  if(!viajeId) return;
+  const kmFinal = Math.max(kmRutaReal, distanciaGPS);
+  const tarifaFinal = calcTarifa(kmFinal);
+  await updateDoc(doc(db, "viajes", viajeId), {estado:'finalizado', km: kmFinal, km_real: kmRutaReal, km_gps: distanciaGPS, tarifa_final: tarifaFinal, fin: serverTimestamp()});
+  alert(`Viaje finalizado:\nRuta real: ${kmRutaReal.toFixed(2)}km\nGPS: ${distanciaGPS.toFixed(2)}km\nCobrado: $${tarifaFinal} (Min $35)`);
+  viajeId=null; puntosGPS=[]; distanciaGPS=0; kmRutaReal=0; viajeActual=null;
+  if(routeLine){ map.removeLayer(routeLine); routeLine=null; }
+  if(gpsLine){ map.removeLayer(gpsLine); gpsLine=null; }
+  document.getElementById('viaje-activo').classList.add('hidden');
+};
+</script>
+</body>
+</html>
