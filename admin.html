@@ -1,31 +1,17 @@
 <!DOCTYPE html>
 <html lang="es">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VIPDRIVE - Admin</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-
-<body class="bg-black text-white min-h-screen p-6">
-    <h1 class="text-3xl font-bold text-yellow-400">VIPDRIVE ADMIN</h1>
-    <div id="stats" class="grid grid-cols-2 gap-4 mt-6"></div>
-    <div id="viajes" class="mt-8 space-y-2"></div>
-    <button onclick="localStorage.clear();location.reload()" class="mt-8 text-red-400 text-sm">Borrar todo</button>
-
-    <script>
-        function render() {
-            const viajes = JSON.parse(localStorage.getItem('vip_viajes') || '[]');
-            document.getElementById('stats').innerHTML = `
-  <div class="bg-zinc-900 p-4 rounded-xl"><p class="text-2xl font-bold">${viajes.length}</p><p class="text-xs text-gray-400">Viajes totales</p></div>
-  <div class="bg-zinc-900 p-4 rounded-xl"><p class="text-2xl font-bold">${viajes.filter(v => v.estado === 'buscando').length}</p><p class="text-xs text-gray-400">Pendientes</p></div>
- `;
-            document.getElementById('viajes').innerHTML = viajes.reverse().map(v => `<div class="bg-zinc-900 p-3 rounded-lg text-sm flex justify-between"><span>${v.cliente} -> ${v.destino}</span><span class="text-gray-400">${v.estado}</span></div>`).join('');
-        }
-        setInterval(render, 2000);
-        render();
-    </script>
-</body>
-
-</html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin</title><script src="https://cdn.tailwindcss.com"></script></head>
+<body class="bg-black text-white p-6"><div class="max-w-3xl mx-auto">
+<h1 class="text-3xl font-black text-yellow-400">VIPDRIVE ADMIN</h1><div id="stats" class="grid grid-cols-3 gap-3 mt-6"></div><div id="viajes" class="mt-8 space-y-2"></div></div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
+const app = initializeApp(firebaseConfig); const db = getFirestore(app);
+const q = query(collection(db, "viajes"), orderBy("fecha","desc"));
+onSnapshot(q, (snap)=>{
+  const viajes = snap.docs.map(d=> ({id:d.id, ...d.data()}));
+  document.getElementById('stats').innerHTML = `<div class="bg-zinc-900 p-4 rounded-2xl"><p class="text-2xl font-black">${viajes.length}</p><p class="text-xs text-gray-400">Totales</p></div><div class="bg-zinc-900 p-4 rounded-2xl"><p class="text-2xl font-black">${viajes.filter(v=>v.estado==='buscando').length}</p><p class="text-xs text-gray-400">Pendientes</p></div><div class="bg-zinc-900 p-4 rounded-2xl"><p class="text-2xl font-black">${viajes.filter(v=>v.estado!=='buscando').length}</p><p class="text-xs text-gray-400">Tomados</p></div>`;
+  document.getElementById('viajes').innerHTML = viajes.map(v=>`<div class="bg-zinc-900 p-3 rounded-xl text-sm flex justify-between"><span>${v.cliente} -> ${v.destino}</span><span class="${v.estado==='buscando'?'text-yellow-400':'text-green-400'}">${v.estado}</span></div>`).join('');
+});
+</script></body></html>
