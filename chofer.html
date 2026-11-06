@@ -1,37 +1,221 @@
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Chofer Real Time</title><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>#map{height:55vh}</style></head>
-<body class="bg-black text-white"><div class="max-w-md mx-auto"><div id="map"></div><div class="p-4">
-<p class="font-black">ID: <span id="miId" class="text-purple-400"></span> - GPS EN VIVO</p><p id="estado" class="text-xs text-green-400">Moviendo carrito en tiempo real...</p>
-<div id="alerta" class="hidden bg-yellow-400 text-black rounded-2xl p-4 mt-3"><p class="font-black">🔔 VIAJE 10 SEG</p><p id="alert-cliente"></p><p id="alert-tarifa" class="font-black"></p><div class="flex gap-2 mt-2"><button id="btn-aceptar" class="flex-1 bg-black text-white py-3 rounded-xl font-black">ACEPTAR</button><button id="btn-rechazar" class="flex-1 bg-white text-black py-3 rounded-xl">RECHAZAR</button></div></div>
-<button id="activar" class="w-full mt-3 bg-purple-600 py-4 rounded-full font-black">ACTIVAR GPS TIEMPO REAL (2 SEG)</button>
-</div></div>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CHOFER - VIPDRIVE</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>#map{height:50vh;background:#222} .blink{animation:blink 1s infinite} @keyframes blink{0%,100%{opacity:1} 50%{opacity:0.6}}</style>
+</head>
+<body class="bg-black text-white">
+<div class="max-w-md mx-auto">
+<div id="map"></div>
+<div class="p-4">
+
+<div class="flex justify-between items-center"><h1 class="font-black text-sm">CHOFER: <span id="miId" class="text-purple-400"></span></h1><span id="estado" class="text-[10px] bg-zinc-800 px-2 py-1 rounded-full">DESACTIVADO</span></div>
+
+<!-- ALERTA NUEVO VIAJE -->
+<div id="alerta" class="hidden bg-yellow-400 text-black rounded-2xl p-4 mt-3 blink">
+<p class="font-black text-lg">🔔 NUEVO VIAJE - 10 SEG</p>
+<p id="alert-cliente" class="font-bold text-sm mt-1"></p>
+<p id="alert-tel" class="text-xs"></p>
+<p id="alert-destino" class="text-xs mt-1"></p>
+<p id="alert-tarifa" class="font-black text-2xl mt-1"></p>
+<p id="alert-km" class="text-xs"></p>
+<div class="w-full bg-black/20 h-2 rounded-full mt-3"><div id="barra" class="bg-black h-2 rounded-full transition-all" style="width:100%"></div></div>
+<div class="flex gap-2 mt-3">
+<button id="btn-aceptar" class="flex-1 bg-black text-white py-4 rounded-xl font-black text-sm">✅ ACEPTAR</button>
+<button id="btn-rechazar" class="flex-1 bg-white text-black py-3 rounded-xl font-black text-sm">❌ RECHAZAR</button>
+</div>
+<a id="btn-gmaps-previo" target="_blank" class="block text-center mt-2 bg-white/80 text-black py-2 rounded-full text-[11px] font-bold">🗺️ VER RECOGIDA EN GOOGLE MAPS</a>
+</div>
+
+<!-- VIAJE ACTIVO -->
+<div id="viaje-activo" class="hidden bg-green-600 rounded-2xl p-4 mt-3">
+<p class="font-black">EN CAMINO A RECOGIDA - RUTA REAL</p>
+<p id="cliente-activo" class="text-sm mt-1"></p>
+<p id="tel-activo" class="text-xs"></p>
+<p id="destino-activo" class="text-xs mt-2 bg-black/20 p-2 rounded-xl"></p>
+<p id="tarifa-activo" class="font-black text-lg mt-2"></p>
+<div id="ruta-info" class="text-[11px] mt-1"></div>
+<a id="gmaps-recogida" target="_blank" class="block mt-3 bg-white text-green-700 text-center py-3 rounded-xl font-black text-sm">🗺️ NAVEGAR A RECOGIDA (GOOGLE MAPS)</a>
+<a id="gmaps-destino" target="_blank" class="block mt-2 bg-black text-white text-center py-3 rounded-xl font-black text-sm">🗺️ DESPUÉS NAVEGAR A DESTINO FINAL</a>
+<button id="finalizar" class="w-full mt-3 bg-white text-green-600 font-black py-3 rounded-xl">✅ FINALIZAR VIAJE</button>
+<button id="cancelar-chofer" class="w-full mt-2 bg-red-600 text-white py-2 rounded-xl text-xs">CANCELAR VIAJE</button>
+</div>
+
+<!-- CANCELADO -->
+<div id="cancelado" class="hidden bg-red-600 rounded-2xl p-4 mt-3 text-center">
+<p class="font-black text-xl">❌ VIAJE CANCELADO</p>
+<p id="cancelado-texto" class="text-sm mt-1">El cliente canceló el viaje</p>
+<button id="btn-volver" class="w-full mt-3 bg-white text-red-600 py-3 rounded-xl font-black">VOLVER A RECIBIR VIAJES</button>
+</div>
+
+<button id="activar" class="w-full mt-4 bg-purple-600 py-4 rounded-full font-black text-sm">📡 ACTIVAR GPS TIEMPO REAL (2 SEG)</button>
+<p class="text-[10px] text-center text-gray-500 mt-2">Ruta real por calles • No línea recta • Aviso si cliente cancela</p>
+
+</div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
 const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
 const app = initializeApp(firebaseConfig); const db = getFirestore(app);
-const miId = new URLSearchParams(location.search).get('id')||'6691234567'; document.getElementById('miId').innerText=miId;
-let map=L.map('map').setView([23.2329,-106.4062],14); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-let myMarker=null, viajeActual=null;
+
+const miId = new URLSearchParams(location.search).get('id') || '6691234567';
+document.getElementById('miId').innerText = miId;
+
+let map = L.map('map',{zoomControl:false}).setView([23.2329,-106.4111],14);
+L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {maxZoom:20}).addTo(map);
+
+let myLat=23.2329, myLng=-106.4111, myMarker=null, routeLine=null, viajeActual=null, timer10=null, seg=10, unsubViajeActual=null;
+
+// RUTA REAL
+async function trazarRutaReal(lat1,lng1,lat2,lng2,color='yellow'){
+  try{
+    const url=`https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson`;
+    const res=await fetch(url); const data=await res.json();
+    if(data.routes && data.routes[0]){
+      const coords=data.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+      if(routeLine) map.removeLayer(routeLine);
+      routeLine=L.polyline(coords,{color,weight:6}).addTo(map);
+      map.fitBounds(routeLine.getBounds(),{padding:[30,30]});
+      return data.routes[0];
+    }
+  }catch(e){ console.log(e); }
+  if(routeLine) map.removeLayer(routeLine);
+  routeLine=L.polyline([[lat1,lng1],[lat2,lng2]],{color,weight:4,dashArray:'8,8'}).addTo(map);
+  return null;
+}
+
 async function activar(){
-  const d=await getDoc(doc(db,"choferes",miId)); if(!d.exists()){ document.getElementById('estado').innerText='❌ No registrado'; return; }
-  document.getElementById('estado').innerText='✅ '+d.data().nombre+' transmitiendo cada 2 seg';
-  // GPS cada 2 segundos + heading para rotar carrito
+  const d=await getDoc(doc(db,"choferes",miId));
+  if(!d.exists()){ document.getElementById('estado').innerText='❌ NO REGISTRADO'; return; }
+  document.getElementById('estado').innerText='✅ '+d.data().nombre+' EN VIVO';
+  document.getElementById('estado').classList.add('bg-green-600');
+  document.getElementById('activar').innerText='✅ GPS ACTIVO - MOVIENDO CARRITO';
+
   navigator.geolocation.watchPosition(async pos=>{
-    const lat=pos.coords.latitude, lng=pos.coords.longitude, heading=pos.coords.heading||0, speed=pos.coords.speed||0;
-    map.setView([lat,lng],15); if(myMarker) map.removeLayer(myMarker); myMarker=L.marker([lat,lng]).addTo(map);
-    await setDoc(doc(db,"choferes",miId),{lat,lng,heading,speed,disponible:viajeActual?false:true,lastUpdate:serverTimestamp(),online:true},{merge:true});
-  }, null, {enableHighAccuracy:true, maximumAge:1000, timeout:5000});
-  // También por intervalo por si watchPosition no dispara
+    myLat=pos.coords.latitude; myLng=pos.coords.longitude;
+    map.setView([myLat,myLng],15);
+    if(myMarker) map.removeLayer(myMarker);
+    myMarker=L.marker([myLat,myLng]).addTo(map).bindPopup("Tú - Chofer");
+    await setDoc(doc(db,"choferes",miId),{lat:myLat,lng:myLng,heading:pos.coords.heading||0,speed:pos.coords.speed||0,disponible:viajeActual?false:true,lastUpdate:serverTimestamp(),online:true},{merge:true});
+    // Si hay viaje activo, actualizar ruta en vivo hacia cliente
+    if(viajeActual && viajeActual.lat){
+      trazarRutaReal(myLat,myLng,viajeActual.lat,viajeActual.lng,'#facc15');
+      document.getElementById('ruta-info').innerText=`Tú a ${dist(myLat,myLng,viajeActual.lat,viajeActual.lng).toFixed(1)} km del cliente - Ruta real`;
+    }
+  }, null, {enableHighAccuracy:true, maximumAge:1000});
+
   setInterval(async ()=>{
     navigator.geolocation.getCurrentPosition(async pos=>{
       await setDoc(doc(db,"choferes",miId),{lat:pos.coords.latitude,lng:pos.coords.longitude,lastUpdate:serverTimestamp(),online:true},{merge:true});
     });
   }, 2000);
 }
-document.getElementById('activar').onclick=activar; activar();
+
+function dist(a,b,c,d){ const R=6371, dLat=(c-a)*Math.PI/180, dLon=(d-b)*Math.PI/180, e=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(e),Math.sqrt(1-e)); }
+
+document.getElementById('activar').onclick=activar;
+activar();
+
+// ESCUCHAR VIAJES PARA MI
 onSnapshot(query(collection(db,"viajes"), where("chofer_solicitado","==",miId), where("estado","==","solicitado_chofer")), snap=>{
-  snap.forEach(docSnap=>{ viajeActual={id:docSnap.id, ...docSnap.data()}; document.getElementById('alerta').classList.remove('hidden'); document.getElementById('alert-cliente').innerText=docSnap.data().cliente; document.getElementById('alert-tarifa').innerText='$'+docSnap.data().tarifa_final; });
+  if(snap.empty) return;
+  snap.forEach(docSnap=>{
+    viajeActual={id:docSnap.id, ...docSnap.data()};
+    const v=viajeActual;
+    document.getElementById('alerta').classList.remove('hidden');
+    document.getElementById('viaje-activo').classList.add('hidden');
+    document.getElementById('cancelado').classList.add('hidden');
+    document.getElementById('alert-cliente').innerText='Cliente: '+v.cliente;
+    document.getElementById('alert-tel').innerText='Tel: '+v.telefono;
+    document.getElementById('alert-destino').innerText='Destino: '+v.destino;
+    document.getElementById('alert-tarifa').innerText='$'+v.tarifa_final;
+    document.getElementById('alert-km').innerText=v.km.toFixed(2)+' km (ruta real)';
+    const gmaps=`https://www.google.com/maps/dir/?api=1&origin=${myLat},${myLng}&destination=${v.lat},${v.lng}&travelmode=driving`;
+    document.getElementById('btn-gmaps-previo').href=gmaps;
+    trazarRutaReal(myLat,myLng,v.lat,v.lng,'#facc15');
+
+    try{ const audio=new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg'); audio.play(); }catch(e){}
+
+    seg=10; clearInterval(timer10);
+    timer10=setInterval(()=>{ seg--; document.getElementById('barra').style.width=seg*10+'%'; if(seg<=0){ clearInterval(timer10); rechazar(true); } },1000);
+
+    // Escuchar si cliente cancela durante los 10s
+    if(unsubViajeActual) unsubViajeActual();
+    unsubViajeActual=onSnapshot(doc(db,"viajes",v.id), s=>{
+      const vd=s.data(); if(!vd) return;
+      if(vd.estado==='cancelado_cliente'){
+        clearInterval(timer10);
+        document.getElementById('alerta').classList.add('hidden');
+        if(routeLine) map.removeLayer(routeLine);
+        mostrarCancelado('Cliente canceló antes de aceptar');
+        viajeActual=null;
+      }
+    });
+  });
 });
-document.getElementById('btn-aceptar').onclick=async()=>{ if(viajeActual){ await updateDoc(doc(db,"viajes",viajeActual.id),{estado:'aceptado'}); document.getElementById('alerta').classList.add('hidden'); } };
-document.getElementById('btn-rechazar').onclick=async()=>{ if(viajeActual){ await updateDoc(doc(db,"viajes",viajeActual.id),{estado:'rechazado'}); document.getElementById('alerta').classList.add('hidden'); viajeActual=null; } };
-</script></body></html>
+
+async function aceptar(){
+  clearInterval(timer10); if(!viajeActual) return;
+  if(unsubViajeActual) unsubViajeActual();
+  await updateDoc(doc(db,"viajes",viajeActual.id),{estado:'aceptado', chofer:miId, chofer_acepto:serverTimestamp()});
+  document.getElementById('alerta').classList.add('hidden');
+  document.getElementById('viaje-activo').classList.remove('hidden');
+  document.getElementById('cliente-activo').innerText='Cliente: '+viajeActual.cliente;
+  document.getElementById('tel-activo').innerText='Tel: '+viajeActual.telefono+' - Llama: '+viajeActual.telefono;
+  document.getElementById('destino-activo').innerText='Destino: '+viajeActual.destino;
+  document.getElementById('tarifa-activo').innerText='$'+viajeActual.tarifa_final+' - '+viajeActual.km.toFixed(2)+' km';
+  const gmapsRecogida=`https://www.google.com/maps/dir/?api=1&origin=${myLat},${myLng}&destination=${viajeActual.lat},${viajeActual.lng}&travelmode=driving`;
+  const gmapsDestino=`https://www.google.com/maps/dir/?api=1&origin=${viajeActual.lat},${viajeActual.lng}&destination=${viajeActual.dest_lat},${viajeActual.dest_lng}&travelmode=driving`;
+  document.getElementById('gmaps-recogida').href=gmapsRecogida;
+  document.getElementById('gmaps-destino').href=gmapsDestino;
+  trazarRutaReal(myLat,myLng,viajeActual.lat,viajeActual.lng,'black');
+  window.open(gmapsRecogida,'_blank');
+
+  // Escuchar cancelación después de aceptar
+  unsubViajeActual=onSnapshot(doc(db,"viajes",viajeActual.id), snap=>{
+    const v=snap.data(); if(!v) return;
+    if(v.estado==='cancelado_cliente'){
+      mostrarCancelado('Cliente canceló el viaje');
+      if(routeLine) map.removeLayer(routeLine);
+      viajeActual=null;
+    }
+    if(v.estado==='finalizado'){
+      alert('Viaje finalizado');
+      location.reload();
+    }
+  });
+}
+
+async function rechazar(auto=false){
+  clearInterval(timer10); if(!viajeActual) return;
+  if(unsubViajeActual) unsubViajeActual();
+  await updateDoc(doc(db,"viajes",viajeActual.id),{estado:'rechazado', motivo:auto?'timeout 10s':'rechazado'});
+  document.getElementById('alerta').classList.add('hidden');
+  if(routeLine) map.removeLayer(routeLine);
+  viajeActual=null;
+}
+
+function mostrarCancelado(texto){
+  document.getElementById('viaje-activo').classList.add('hidden');
+  document.getElementById('alerta').classList.add('hidden');
+  document.getElementById('cancelado').classList.remove('hidden');
+  document.getElementById('cancelado-texto').innerText=texto;
+  if(routeLine) map.removeLayer(routeLine);
+}
+
+document.getElementById('btn-aceptar').onclick=aceptar;
+document.getElementById('btn-rechazar').onclick=()=>rechazar(false);
+document.getElementById('btn-volver').onclick=()=>{ document.getElementById('cancelado').classList.add('hidden'); viajeActual=null; };
+document.getElementById('finalizar').onclick=async()=>{ if(!viajeActual) return; if(!confirm('¿Finalizar viaje por $'+viajeActual.tarifa_final+'?')) return; await updateDoc(doc(db,"viajes",viajeActual.id),{estado:'finalizado', fin:serverTimestamp()}); alert('Viaje finalizado'); location.reload(); };
+document.getElementById('cancelar-chofer').onclick=async()=>{ if(!viajeActual) return; if(!confirm('¿Cancelar viaje?')) return; await updateDoc(doc(db,"viajes",viajeActual.id),{estado:'cancelado_chofer'}); location.reload(); };
+</script>
+</body>
+</html>
