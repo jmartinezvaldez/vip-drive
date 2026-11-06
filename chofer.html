@@ -1,31 +1,37 @@
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Chofer $10/km Min $35</title><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>#map{height:55vh}</style></head>
-<body class="bg-zinc-950 text-white"><div class="max-w-md mx-auto"><div id="map"></div><div class="p-4">
-<h1 class="font-black text-xl">CHOFER $10/KM MIN $35</h1><p id="miId" class="text-purple-400 text-xs"></p>
-<div id="viaje-activo" class="hidden bg-purple-600 text-white rounded-2xl p-4 mt-3"><p class="font-black">VIAJE EN CURSO</p><p id="cliente-activo"></p><p id="destino-activo" class="text-xs"></p><p class="text-sm mt-2">Ruta real: <b id="km-ruta">--</b> | Total: <b id="tarifa-total">$35</b></p><p class="text-xs">GPS recorrido: <b id="km-gps">0.00 km</b></p><div class="w-full bg-black/20 rounded-full h-2 mt-2"><div id="barra" class="bg-white h-2 rounded-full" style="width:0%"></div></div><button id="finalizar" class="w-full mt-3 bg-white text-purple-600 font-black py-3 rounded-xl">FINALIZAR</button></div>
-<div class="bg-zinc-900 rounded-2xl p-3 mt-3"><p class="text-xs">Solo choferes registrados por admin</p><button id="guardar" class="w-full mt-2 bg-white text-black font-bold py-2 rounded-lg">ACTIVAR GPS + RUTA REAL</button><p id="estado" class="text-xs text-green-400 mt-2"></p></div>
-<h2 class="font-bold mt-4 text-sm">Solicitudes con tarifa real</h2><div id="lista" class="mt-2 space-y-2 pb-24"></div></div></div>
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Chofer Real Time</title><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>#map{height:55vh}</style></head>
+<body class="bg-black text-white"><div class="max-w-md mx-auto"><div id="map"></div><div class="p-4">
+<p class="font-black">ID: <span id="miId" class="text-purple-400"></span> - GPS EN VIVO</p><p id="estado" class="text-xs text-green-400">Moviendo carrito en tiempo real...</p>
+<div id="alerta" class="hidden bg-yellow-400 text-black rounded-2xl p-4 mt-3"><p class="font-black">🔔 VIAJE 10 SEG</p><p id="alert-cliente"></p><p id="alert-tarifa" class="font-black"></p><div class="flex gap-2 mt-2"><button id="btn-aceptar" class="flex-1 bg-black text-white py-3 rounded-xl font-black">ACEPTAR</button><button id="btn-rechazar" class="flex-1 bg-white text-black py-3 rounded-xl">RECHAZAR</button></div></div>
+<button id="activar" class="w-full mt-3 bg-purple-600 py-4 rounded-full font-black">ACTIVAR GPS TIEMPO REAL (2 SEG)</button>
+</div></div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, query, orderBy, onSnapshot, doc, setDoc, updateDoc, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
 const app = initializeApp(firebaseConfig); const db = getFirestore(app);
-const miId = new URLSearchParams(location.search).get('id')||'6691234567'; document.getElementById('miId').innerText='ID: '+miId;
-let map = L.map('map').setView([23.2329, -106.4062], 13); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-let myMarker, routeLine, gpsLine, puntosGPS=[], distanciaGPS=0, viajeId=null, lastPos=null, kmRutaReal=0;
-function haversine(a,b,c,d){const R=6371, dLat=(c-a)*Math.PI/180, dLon=(d-b)*Math.PI/180, e=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(e),Math.sqrt(1-e));}
-function calcTarifa(km){ return Math.max(35, Math.round(km*10)); }
-async function trazarRutaReal(lat1,lng1,lat2,lng2){ try{ const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson`); const j=await r.json(); if(j.routes && j.routes[0]){ kmRutaReal=j.routes[0].distance/1000; const coords=j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]); if(routeLine) map.removeLayer(routeLine); routeLine=L.polyline(coords,{color:'#8B5CF6',weight:8}).addTo(map); map.fitBounds(routeLine.getBounds(),{padding:[50,50]}); document.getElementById('km-ruta').innerText=kmRutaReal.toFixed(2)+' km'; document.getElementById('tarifa-total').innerText='$'+calcTarifa(Math.max(kmRutaReal,distanciaGPS)); return {km:kmRutaReal, coords:coords}; } }catch(e){} return null; }
-function actualizarTotal(){ const total=Math.max(kmRutaReal,distanciaGPS); const tarifa=calcTarifa(total); document.getElementById('km-gps').innerText=distanciaGPS.toFixed(2)+' km'; document.getElementById('tarifa-total').innerText='$'+tarifa; document.getElementById('barra').style.width=Math.min(100,total*8)+'%'; if(viajeId) updateDoc(doc(db,"viajes",viajeId),{km_real:kmRutaReal, km_gps:distanciaGPS, km:total, tarifa_final:tarifa}); }
+const miId = new URLSearchParams(location.search).get('id')||'6691234567'; document.getElementById('miId').innerText=miId;
+let map=L.map('map').setView([23.2329,-106.4062],14); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+let myMarker=null, viajeActual=null;
 async function activar(){
-  const d=await getDoc(doc(db,"choferes",miId)); if(!d.exists() || d.data().aprobado===false){ document.getElementById('estado').innerText='❌ No estás registrado por admin'; return; }
-  document.getElementById('estado').innerText='✅ '+d.data().nombre+' verificado';
-  navigator.geolocation.watchPosition(async pos=>{ const lat=pos.coords.latitude, lng=pos.coords.longitude; map.setView([lat,lng],15); if(myMarker) map.removeLayer(myMarker); myMarker=L.marker([lat,lng]).addTo(map); await setDoc(doc(db,"choferes",miId),{lat,lng,disponible:viajeId?false:true,lastUpdate:serverTimestamp()},{merge:true}); if(viajeId && lastPos){ const di=haversine(lastPos.lat,lastPos.lng,lat,lng); if(di>0.02){ distanciaGPS+=di; puntosGPS.push([lat,lng]); if(gpsLine) map.removeLayer(gpsLine); gpsLine=L.polyline(puntosGPS,{color:'yellow',weight:4,dashArray:'10,10'}).addTo(map); actualizarTotal(); } } if(viajeId && !lastPos) puntosGPS=[[lat,lng]]; lastPos={lat,lng}; }, null,{enableHighAccuracy:true});
+  const d=await getDoc(doc(db,"choferes",miId)); if(!d.exists()){ document.getElementById('estado').innerText='❌ No registrado'; return; }
+  document.getElementById('estado').innerText='✅ '+d.data().nombre+' transmitiendo cada 2 seg';
+  // GPS cada 2 segundos + heading para rotar carrito
+  navigator.geolocation.watchPosition(async pos=>{
+    const lat=pos.coords.latitude, lng=pos.coords.longitude, heading=pos.coords.heading||0, speed=pos.coords.speed||0;
+    map.setView([lat,lng],15); if(myMarker) map.removeLayer(myMarker); myMarker=L.marker([lat,lng]).addTo(map);
+    await setDoc(doc(db,"choferes",miId),{lat,lng,heading,speed,disponible:viajeActual?false:true,lastUpdate:serverTimestamp(),online:true},{merge:true});
+  }, null, {enableHighAccuracy:true, maximumAge:1000, timeout:5000});
+  // También por intervalo por si watchPosition no dispara
+  setInterval(async ()=>{
+    navigator.geolocation.getCurrentPosition(async pos=>{
+      await setDoc(doc(db,"choferes",miId),{lat:pos.coords.latitude,lng:pos.coords.longitude,lastUpdate:serverTimestamp(),online:true},{merge:true});
+    });
+  }, 2000);
 }
-document.getElementById('guardar').onclick=activar; activar();
-onSnapshot(query(collection(db,"viajes"),orderBy("fecha","desc")), snap=>{
-  const viajes=snap.docs.filter(d=>d.data().estado==='buscando'); if(viajeId) return;
-  document.getElementById('lista').innerHTML=viajes.map(d=>{ const v=d.data(); const km=v.km?v.km.toFixed(2):'--'; const tarifa=v.tarifa_final?'$'+v.tarifa_final:'$35 min'; return `<div class="bg-zinc-900 p-3 rounded-2xl"><p class="font-bold text-sm">${v.cliente} -> ${v.destino}</p><p class="text-xs text-gray-400">${km} km • ${tarifa} • ${v.dest_display?v.dest_display.split(',')[0]:''}</p><button data-id="${d.id}" data-cliente="${v.cliente}" data-dest="${v.destino}" data-dlat="${v.dest_lat||''}" data-dlng="${v.dest_lng||''}" data-clat="${v.lat}" data-clng="${v.lng}" class="tomar w-full mt-2 bg-purple-600 text-white py-2 rounded-xl font-black">TOMAR - TRAZAR RUTA REAL</button></div>`;}).join('');
-  document.querySelectorAll('.tomar').forEach(b=> b.onclick=async()=>{ viajeId=b.dataset.id; distanciaGPS=0; puntosGPS=[]; lastPos=null; kmRutaReal=0; document.getElementById('viaje-activo').classList.remove('hidden'); document.getElementById('cliente-activo').innerText=b.dataset.cliente; document.getElementById('destino-activo').innerText=b.dataset.dest; document.getElementById('lista').innerHTML='<p>Trazando ruta real...</p>'; if(b.dataset.dlat) await trazarRutaReal(parseFloat(b.dataset.clat), parseFloat(b.dataset.clng), parseFloat(b.dataset.dlat), parseFloat(b.dataset.dlng)); await updateDoc(doc(db,"viajes",viajeId),{estado:'en curso', chofer:miId, inicio:serverTimestamp()}); });
+document.getElementById('activar').onclick=activar; activar();
+onSnapshot(query(collection(db,"viajes"), where("chofer_solicitado","==",miId), where("estado","==","solicitado_chofer")), snap=>{
+  snap.forEach(docSnap=>{ viajeActual={id:docSnap.id, ...docSnap.data()}; document.getElementById('alerta').classList.remove('hidden'); document.getElementById('alert-cliente').innerText=docSnap.data().cliente; document.getElementById('alert-tarifa').innerText='$'+docSnap.data().tarifa_final; });
 });
-document.getElementById('finalizar').onclick=async()=>{ if(!viajeId) return; const total=Math.max(kmRutaReal,distanciaGPS); const tarifa=calcTarifa(total); await updateDoc(doc(db,"viajes",viajeId),{estado:'finalizado', km:total, tarifa_final:tarifa, fin:serverTimestamp()}); alert(`Finalizado: Ruta ${kmRutaReal.toFixed(2)}km + GPS ${distanciaGPS.toFixed(2)}km = $${tarifa}`); viajeId=null; puntosGPS=[]; distanciaGPS=0; kmRutaReal=0; if(routeLine) map.removeLayer(routeLine); if(gpsLine) map.removeLayer(gpsLine); document.getElementById('viaje-activo').classList.add('hidden'); };
+document.getElementById('btn-aceptar').onclick=async()=>{ if(viajeActual){ await updateDoc(doc(db,"viajes",viajeActual.id),{estado:'aceptado'}); document.getElementById('alerta').classList.add('hidden'); } };
+document.getElementById('btn-rechazar').onclick=async()=>{ if(viajeActual){ await updateDoc(doc(db,"viajes",viajeActual.id),{estado:'rechazado'}); document.getElementById('alerta').classList.add('hidden'); viajeActual=null; } };
 </script></body></html>
