@@ -1,140 +1,171 @@
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>VIPDRIVE - Ruta Real</title><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>#map{height:52vh} .sheet{background:white;border-radius:28px 28px 0 0;padding:16px;color:black;min-height:48vh} .car{transition: all 2s linear !important}</style></head>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10131b">
+  <title>VIPDRIVE | Solicita tu viaje</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root{color-scheme:light;--ink:#10131b;--muted:#687080;--accent:#7657f6}
+    *{box-sizing:border-box} body{margin:0;background:#eef0f5;color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+    #map{height:54vh;min-height:340px;width:100%;z-index:1}
+    .topbar{position:absolute;top:12px;left:12px;right:12px;z-index:500;background:#10131beF;color:white;border:1px solid #ffffff22;border-radius:18px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 8px 30px #0003}
+    .panel{position:relative;z-index:2;margin-top:-22px;background:#fff;border-radius:26px 26px 0 0;padding:22px 18px max(22px,env(safe-area-inset-bottom));box-shadow:0 -8px 35px #1112;min-height:48vh}
+    .field{width:100%;background:#f2f3f7;border:1px solid #e6e8ef;border-radius:14px;padding:13px 14px;font-size:14px;outline:none;color:#111827}
+    .field:focus{border-color:#927cff;box-shadow:0 0 0 3px #7657f61c}
+    .primary{background:var(--accent);color:white;border-radius:15px;padding:15px;font-weight:900;letter-spacing:.02em;width:100%;box-shadow:0 8px 18px #7657f633}
+    .primary:disabled{background:#d8dbe3;color:#858b99;box-shadow:none}
+    .secondary{border:1px solid #e5e7eb;background:#fff;border-radius:13px;padding:12px;font-weight:800}
+    .pill{border-radius:999px;padding:6px 10px;font-size:11px;font-weight:800}
+    .leaflet-control-attribution{font-size:9px}
+    .driver-icon{background:#fff;border:2px solid #7657f6;border-radius:50%;width:42px;height:42px;display:grid;place-items:center;font-size:22px;box-shadow:0 3px 12px #0003}
+    .driver-icon.selected{border:3px solid #16a34a}
+    .hidden{display:none!important}
+  </style>
+</head>
 <body>
-<div class="p-2 bg-black text-white flex justify-between text-[11px] fixed top-0 left-0 right-0 z-[1000]"><b>VIPDRIVE • RUTA REAL</b><span id="count">0 choferes</span></div><div id="map" style="margin-top:32px"></div>
-<div class="sheet">
+  <main class="max-w-xl mx-auto bg-white min-h-screen shadow-xl relative">
+    <section class="relative">
+      <div id="map" aria-label="Mapa para elegir destino"></div>
+      <header class="topbar"><div><div class="font-black tracking-wide">VIPDRIVE</div><div class="text-[10px] text-white/60">TU VIAJE, A TU MANERA</div></div><span id="driver-count" class="pill bg-white/10 text-white">Buscando conductores…</span></header>
+      <button id="btn-my-location" class="absolute bottom-8 right-4 z-[500] bg-white rounded-full w-12 h-12 shadow-lg text-xl" title="Mi ubicación">◎</button>
+    </section>
 
-<!-- PANTALLA NORMAL -->
-<div id="pantalla-normal">
-<h1 class="font-black text-[16px] text-black">1. Toca el mapa para destino</h1>
-<input id="destino" class="w-full mt-2 bg-gray-100 p-3 rounded-xl text-black font-bold text-sm" placeholder="Toca mapa o escribe: Av Camaron...">
-<div class="flex justify-between items-center mt-3"><h1 class="font-black text-[16px]">2. Toca carrito 🚗</h1><button id="btn-deseleccionar" class="hidden bg-red-100 text-red-600 px-3 py-1 rounded-full text-[10px] font-black">✕ QUITAR CHOFER</button></div>
-<div class="flex justify-between text-xs mt-1"><span>Dist real: <b id="km">-- km</b></span><span>Tarifa: <b id="tarifa" class="text-purple-600">$35 min</b></span><span id="chofer-elegido" class="text-green-600 font-black"></span></div>
-<div class="flex gap-2 mt-3"><input id="nombre" placeholder="Tu nombre" class="flex-1 p-3 bg-gray-100 rounded-xl text-sm text-black"><input id="tel" placeholder="WhatsApp" class="flex-1 p-3 bg-gray-100 rounded-xl text-sm text-black"></div>
-<button id="btn-solicitar" class="w-full mt-3 bg-gray-300 text-gray-500 py-4 rounded-full font-black text-sm" disabled>TOCÁ MAPA + CARRITO</button>
-<p id="status" class="text-center text-[10px] mt-2 text-gray-500">Ruta real por calles • No línea recta</p>
-</div>
+    <section class="panel">
+      <div id="normal-screen">
+        <div class="flex items-center justify-between mb-4">
+          <div><p class="text-xs font-bold text-violet-600 uppercase tracking-widest">Solicita un viaje</p><h1 class="text-2xl font-black mt-1">¿A dónde vamos?</h1></div>
+          <span class="pill bg-violet-50 text-violet-700">MAZATLÁN</span>
+        </div>
+        <label class="text-xs font-bold text-gray-500">DESTINO</label>
+        <div class="flex gap-2 mt-1">
+          <input id="destination" class="field" placeholder="Escribe una dirección o toca el mapa">
+          <button id="search-destination" class="secondary text-violet-700" aria-label="Buscar destino">⌕</button>
+        </div>
+        <p id="map-hint" class="text-[11px] text-gray-500 mt-2">Selecciona el destino escribiendo una dirección o tocando el mapa.</p>
+        <div class="grid grid-cols-3 gap-2 mt-4">
+          <div class="rounded-xl bg-gray-50 p-3"><p class="text-[10px] text-gray-500">DISTANCIA</p><b id="distance" class="text-sm">-- km</b></div>
+          <div class="rounded-xl bg-gray-50 p-3"><p class="text-[10px] text-gray-500">TARIFA ESTIMADA</p><b id="fare" class="text-sm text-violet-700">$35</b></div>
+          <div class="rounded-xl bg-gray-50 p-3"><p class="text-[10px] text-gray-500">CONDUCTORES</p><b id="available-count" class="text-sm">0</b></div>
+        </div>
+        <div class="mt-4"><label class="text-xs font-bold text-gray-500">TUS DATOS</label>
+          <div class="grid grid-cols-2 gap-2 mt-1"><input id="passenger-name" class="field" maxlength="60" placeholder="Tu nombre"><input id="passenger-phone" class="field" inputmode="tel" maxlength="20" placeholder="WhatsApp"></div>
+        </div>
+        <div class="mt-4 flex justify-between items-center"><h2 class="font-black">Conductores disponibles</h2><span id="selected-driver-label" class="text-xs text-green-700 font-bold"></span></div>
+        <div id="driver-list" class="mt-2 space-y-2"><p class="text-xs text-gray-500 bg-gray-50 rounded-xl p-3">Esperando conductores conectados…</p></div>
+        <button id="request-ride" class="primary mt-4" disabled>ELIGE DESTINO Y CONDUCTOR</button>
+        <p id="status" role="status" class="text-center text-[11px] text-gray-500 mt-3">Activa tu ubicación para calcular la ruta desde donde estás.</p>
+      </div>
 
-<!-- PANTALLA VIAJE ACEPTADO - BLOQUEA TODO -->
-<div id="pantalla-aceptado" class="hidden">
-<div class="bg-green-600 text-white p-4 rounded-2xl">
-<p class="font-black text-lg">✅ <span id="acept-nombre"></span> viene por ti</p><p id="acept-detalle" class="text-sm"></p>
-<div class="w-full bg-black/20 h-2 rounded-full mt-2"><div id="barra-progreso" class="bg-white h-2 rounded-full" style="width:30%"></div></div>
-<p class="text-[11px] mt-1">Viendo ruta real del chofer hacia ti en mapa Google</p>
-</div>
-<div class="mt-3 bg-black text-white p-3 rounded-xl flex justify-between text-xs"><span>Tarifa: <b id="acept-tarifa"></b></span><span>Dist: <b id="acept-km"></b></span><span id="acept-dist-chofer"></span></div>
-<div class="flex gap-2 mt-3"><a id="btn-gmaps-acept" target="_blank" class="flex-1 bg-black text-white text-center py-3 rounded-full font-black text-xs">🗺️ VER EN GOOGLE MAPS</a><button id="btn-cancelar-acept" class="flex-1 bg-red-600 text-white py-3 rounded-full font-black text-xs">✕ CANCELAR VIAJE</button></div>
-<p class="text-center text-[10px] mt-2 text-gray-500">No puedes solicitar otro viaje hasta cancelar o terminar</p>
-</div>
-
-</div>
-
-<div id="modal-chofer" class="hidden fixed inset-0 bg-black/70 z-[2000] flex items-end"><div class="bg-white w-full rounded-t-[32px] max-w-md mx-auto max-h-[80vh] overflow-auto p-5"><div class="flex gap-3"><img id="img1" class="w-20 h-20 rounded-full object-cover"><div><p id="m-nombre" class="font-black text-xl text-black"></p><p id="m-auto" class="text-sm"></p><p id="m-dist" class="text-xs text-purple-600 font-bold"></p></div></div><button id="m-elegir" class="w-full mt-4 bg-black text-white py-4 rounded-full font-black">ELEGIR ESTE CHOFER</button><button id="m-cerrar" class="w-full mt-2 bg-gray-100 py-3 rounded-full text-xs">CERRAR</button></div></div>
+      <div id="waiting-screen" class="hidden">
+        <div class="flex items-center gap-3"><div class="w-12 h-12 rounded-2xl bg-violet-100 grid place-items-center text-2xl">🚘</div><div><p class="text-xs uppercase tracking-widest text-violet-600 font-black">Solicitud enviada</p><h2 class="text-xl font-black">Esperando al conductor</h2></div></div>
+        <div class="bg-gray-50 rounded-2xl p-4 mt-4"><p class="text-xs text-gray-500">CONDUCTOR</p><p id="waiting-driver" class="font-black text-lg">—</p><div class="flex justify-between mt-3 text-sm"><span>Tarifa estimada</span><b id="waiting-fare">$35</b></div><div class="flex justify-between mt-1 text-sm"><span>Distancia</span><b id="waiting-distance">—</b></div><p id="waiting-status" class="text-xs text-violet-700 font-bold mt-4">Notificando al conductor…</p></div>
+        <a id="open-driver-route" class="secondary block text-center mt-3 hidden" target="_blank" rel="noopener">Ver ubicación del conductor</a>
+        <button id="cancel-ride" class="w-full mt-3 rounded-xl bg-red-50 text-red-700 py-3 font-black">CANCELAR SOLICITUD</button>
+      </div>
+    </section>
+  </main>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, onSnapshot, doc, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
-const app = initializeApp(firebaseConfig); const db = getFirestore(app);
-let myLat=23.2329, myLng=-106.4111, destLat=null, destLng=null, kmReal=0, map, routeLine=null, carMarkers={}, choferSel=null, viajeId=null, routeChofer=null, driverLiveMarker=null, unsubViaje=null;
-map=L.map('map',{zoomControl:false}).setView([myLat,myLng],14); L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {maxZoom:20}).addTo(map);
-function calcTarifa(k){ return Math.max(35, Math.round(k*10)); }
-function dist(a,b,c,d){ const R=6371, dLat=(c-a)*Math.PI/180, dLon=(d-b)*Math.PI/180, e=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(e),Math.sqrt(1-e)); }
-// RUTA REAL POR CALLES con OSRM
-async function trazarRutaReal(lat1,lng1,lat2,lng2,color='#8B5CF6'){
-  try{
-    const url=`https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson`;
-    const res=await fetch(url); const data=await res.json();
-    if(data.routes && data.routes[0]){
-      const coords=data.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
-      kmReal=data.routes[0].distance/1000;
-      document.getElementById('km').innerText=kmReal.toFixed(2)+' km (ruta real)';
-      document.getElementById('tarifa').innerText='$'+calcTarifa(kmReal);
-      if(routeLine) map.removeLayer(routeLine);
-      routeLine=L.polyline(coords,{color,weight:6,opacity:0.9}).addTo(map);
-      map.fitBounds(routeLine.getBounds(),{padding:[50,50]});
-      return coords;
-    }
-  }catch(e){ console.log('OSRM fail, uso recta'); }
-  // fallback recta
-  kmReal=dist(lat1,lng1,lat2,lng2)*1.3; document.getElementById('km').innerText=kmReal.toFixed(2)+' km'; document.getElementById('tarifa').innerText='$'+calcTarifa(kmReal);
-  if(routeLine) map.removeLayer(routeLine); routeLine=L.polyline([[lat1,lng1],[lat2,lng2]],{color,weight:5,dashArray:'10,10'}).addTo(map); return [[lat1,lng1],[lat2,lng2]];
-}
-navigator.geolocation.getCurrentPosition(p=>{ myLat=p.coords.latitude; myLng=p.coords.longitude; map.setView([myLat,myLng],16); L.marker([myLat,myLng]).addTo(map).bindPopup("Tú - Recogida"); });
-map.on('click', async e=>{ if(document.getElementById('pantalla-aceptado').classList.contains('hidden')===false) return; destLat=e.latlng.lat; destLng=e.latlng.lng; document.getElementById('destino').value=`Destino ${destLat.toFixed(4)}`; await trazarRutaReal(myLat,myLng,destLat,destLng,'#8B5CF6'); validarBoton(); });
-function validarBoton(){ const btn=document.getElementById('btn-solicitar'); const desel=document.getElementById('btn-deseleccionar'); if(destLat && choferSel){ btn.disabled=false; btn.classList.remove('bg-gray-300','text-gray-500'); btn.classList.add('bg-black','text-white'); btn.innerText=`SOLICITAR A ${choferSel.nombre.toUpperCase()} POR $${calcTarifa(kmReal)}`; desel.classList.remove('hidden'); document.getElementById('chofer-elegido').innerText=`✓ ${choferSel.nombre}`; } else { desel.classList.add('hidden'); if(!destLat) btn.innerText='1. TOCA MAPA PARA DESTINO'; else btn.innerText='2. TOCA UN CARRITO'; } }
-function deseleccionar(){ choferSel=null; document.getElementById('modal-chofer').classList.add('hidden'); validarBoton(); document.getElementById('chofer-elegido').innerText=''; }
-document.getElementById('btn-deseleccionar').onclick=deseleccionar;
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {getFirestore,collection,addDoc,onSnapshot,doc,serverTimestamp,updateDoc,getDoc} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-onSnapshot(collection(db,"choferes"), snap=>{
-  document.getElementById('count').innerText=snap.size+' choferes';
-  snap.docs.forEach(docu=>{
-    const c=docu.data(); const id=docu.id; if(!c.lat) return;
-    if(carMarkers[id]) carMarkers[id].setLatLng([c.lat,c.lng]);
-    else {
-      const icon=L.divIcon({className:'car', html:`<div style="background:white;border:3px solid ${choferSel && choferSel.id===id?'#22c55e':'#8B5CF6'};width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center">🚗</div>`, iconSize:[46,46]});
-      const m=L.marker([c.lat,c.lng],{icon}).addTo(map);
-      m.on('click', ()=>{ if(document.getElementById('pantalla-aceptado').classList.contains('hidden')===false) return; choferSel={id, ...c}; document.getElementById('img1').src=c.fotoChofer||c.foto||'https://i.pravatar.cc/150'; document.getElementById('m-nombre').innerText=c.nombre; document.getElementById('m-auto').innerText=`${c.auto||''} ${c.anio||''} ${c.placas||''}`; document.getElementById('m-dist').innerText=`A ${dist(myLat,myLng,c.lat,c.lng).toFixed(1)} km`; document.getElementById('modal-chofer').classList.remove('hidden'); validarBoton(); });
-      carMarkers[id]=m;
-    }
-    if(viajeId && choferSel && id===choferSel.id){
-      // ACTUALIZAR RUTA REAL CHOFER -> CLIENTE EN VIVO
-      trazarRutaChoferReal(c.lat,c.lng,myLat,myLng);
-    }
+const firebaseConfig={apiKey:"AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M",authDomain:"vip-drive-f19c1.firebaseapp.com",projectId:"vip-drive-f19c1",storageBucket:"vip-drive-f19c1.firebasestorage.app",messagingSenderId:"696888361898",appId:"1:696888361898:web:789595b0782015384521d3"};
+const app=initializeApp(firebaseConfig),db=getFirestore(app);
+const $=id=>document.getElementById(id);
+const DEFAULT={lat:23.2329,lng:-106.4111};
+let myLat=DEFAULT.lat,myLng=DEFAULT.lng,destLat=null,destLng=null,routeKm=0,map,routeLine=null,pickupMarker=null,destinationMarker=null;
+let drivers=new Map(),selectedDriver=null,rideId=null,unsubscribeRide=null,unsubscribeDrivers=null,requestBusy=false,lastRouteAt=0;
+
+map=L.map("map",{zoomControl:false}).setView([myLat,myLng],14);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
+pickupMarker=L.marker([myLat,myLng]).addTo(map).bindPopup("Punto de recogida");
+function distanceKm(a,b,c,d){const r=6371,dl=(c-a)*Math.PI/180,dn=(d-b)*Math.PI/180,x=Math.sin(dl/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dn/2)**2;return 2*r*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
+function fare(km){return Math.max(35,Math.round(km*10))}
+function setStatus(message){$("status").textContent=message}
+function setButton(){const valid=destLat!==null&&!!selectedDriver&&!requestBusy;$("request-ride").disabled=!valid;$("request-ride").textContent=requestBusy?"ENVIANDO…":!destLat?"SELECCIONA UN DESTINO":!selectedDriver?"ELIGE UN CONDUCTOR":`SOLICITAR VIAJE · $${fare(routeKm)}`}
+function clearRoute(){if(routeLine){map.removeLayer(routeLine);routeLine=null}}
+async function routeBetween(aLat,aLng,bLat,bLng){
+  const url=`https://router.project-osrm.org/route/v1/driving/${aLng},${aLat};${bLng},${bLat}?overview=full&geometries=geojson`;
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),9000);
+  try{const res=await fetch(url,{signal:controller.signal});if(!res.ok)throw Error("route");const data=await res.json();if(!data.routes?.length)throw Error("no route");return {km:data.routes[0].distance/1000,coords:data.routes[0].geometry.coordinates.map(([lng,lat])=>[lat,lng])}}
+  finally{clearTimeout(timeout)}
+}
+async function selectDestination(lat,lng,label){
+  destLat=lat;destLng=lng;$("destination").value=label||`Destino ${lat.toFixed(5)}, ${lng.toFixed(5)}`;setStatus("Calculando ruta por calles…");
+  try{const r=await routeBetween(myLat,myLng,destLat,destLng);routeKm=r.km;clearRoute();routeLine=L.polyline(r.coords,{color:"#7657f6",weight:6,opacity:.9}).addTo(map);map.fitBounds(routeLine.getBounds(),{padding:[35,35]});$("map-hint").textContent="Ruta calculada por calles."}
+  catch{routeKm=distanceKm(myLat,myLng,destLat,destLng)*1.3;clearRoute();routeLine=L.polyline([[myLat,myLng],[destLat,destLng]],{color:"#7657f6",weight:5,dashArray:"8 8"}).addTo(map);$("map-hint").textContent="No se pudo consultar la ruta. Distancia aproximada en línea de referencia."}
+  if(destinationMarker)map.removeLayer(destinationMarker);destinationMarker=L.marker([lat,lng]).addTo(map).bindPopup("Destino");$("distance").textContent=routeKm.toFixed(1)+" km";$("fare").textContent="$"+fare(routeKm);setButton();setStatus("Selecciona un conductor disponible para continuar.");
+}
+map.on("click",e=>{if(!rideId)selectDestination(e.latlng.lat,e.latlng.lng,$("destination").value.trim()||"Destino seleccionado en el mapa")});
+function renderDrivers(){
+  const list=$("driver-list");list.innerHTML="";let available=[...drivers.values()].filter(d=>d.online===true&&d.disponible!==false&&Number.isFinite(d.lat)&&Number.isFinite(d.lng)&&d.fresh);
+  $("driver-count").textContent=available.length+" disponibles";$("available-count").textContent=available.length;
+  if(selectedDriver&&!available.some(d=>d.id===selectedDriver.id)){selectedDriver=null;$("selected-driver-label").textContent=""}
+  if(!available.length){list.innerHTML='<p class="text-xs text-gray-500 bg-gray-50 rounded-xl p-3">No hay conductores disponibles en este momento.</p>'}
+  available.sort((a,b)=>distanceKm(myLat,myLng,a.lat,a.lng)-distanceKm(myLat,myLng,b.lat,b.lng));
+  for(const d of available){
+    const km=distanceKm(myLat,myLng,d.lat,d.lng),chosen=selectedDriver?.id===d.id;
+    const button=document.createElement("button");button.type="button";button.className=`w-full text-left flex items-center gap-3 p-3 rounded-xl border ${chosen?"border-green-500 bg-green-50":"border-gray-100 bg-gray-50"}`;
+    const avatar=document.createElement("div");avatar.className="w-11 h-11 rounded-full bg-violet-100 grid place-items-center text-xl";avatar.textContent="🚗";
+    const details=document.createElement("div");details.className="flex-1 min-w-0";
+    const name=document.createElement("div");name.className="font-black text-sm";name.textContent=d.nombre||"Conductor";
+    const car=document.createElement("div");car.className="text-xs text-gray-500";car.textContent=[d.auto,d.anio,d.placas].filter(Boolean).join(" · ")||"Vehículo registrado";
+    const dist=document.createElement("div");dist.className="text-[11px] text-violet-700 font-bold";dist.textContent=`A ${km.toFixed(1)} km`;
+    details.append(name,car,dist);const tag=document.createElement("span");tag.className="pill "+(chosen?"bg-green-600 text-white":"bg-white text-gray-600");tag.textContent=chosen?"ELEGIDO":"ELEGIR";button.append(avatar,details,tag);
+    button.onclick=()=>{selectedDriver=d;$("selected-driver-label").textContent="✓ "+(d.nombre||"Conductor");renderDrivers();setButton();};list.append(button);
+  }
+  setButton();
+}
+unsubscribeDrivers=onSnapshot(collection(db,"choferes"),snap=>{
+  const now=Date.now(),seen=new Set();
+  snap.forEach(s=>{const d=s.data(),id=s.id;seen.add(id);let updated=d.lastUpdate?.toMillis?.()||0;const fresh=updated>0&&now-updated<90000;
+    drivers.set(id,{id,...d,fresh});
   });
+  for(const id of [...drivers.keys()])if(!seen.has(id))drivers.delete(id);
+  renderDrivers();
+  for(const [id,d] of drivers){if(!Number.isFinite(d.lat)||!Number.isFinite(d.lng))continue;if(d.online===true&&d.fresh){if(!window.driverMarkers[id])window.driverMarkers[id]=L.marker([d.lat,d.lng],{icon:L.divIcon({className:"",html:`<div class="driver-icon ${selectedDriver?.id===id?"selected":""}">🚗</div>`,iconSize:[42,42],iconAnchor:[21,21]})}).addTo(map);else window.driverMarkers[id].setLatLng([d.lat,d.lng])}else if(window.driverMarkers[id]){map.removeLayer(window.driverMarkers[id]);delete window.driverMarkers[id]}}
 });
-async function trazarRutaChoferReal(latC,lngC,latU,lngU){
-  try{
-    const url=`https://router.project-osrm.org/route/v1/driving/${lngC},${latC};${lngU},${latU}?overview=full&geometries=geojson`;
-    const res=await fetch(url); const data=await res.json();
-    if(data.routes && data.routes[0]){
-      const coords=data.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
-      if(routeChofer) map.removeLayer(routeChofer);
-      routeChofer=L.polyline(coords,{color:'black',weight:5}).addTo(map);
-      const kmChofer=data.routes[0].distance/1000;
-      document.getElementById('acept-dist-chofer').innerText=`Chofer a ${kmChofer.toFixed(1)} km`;
-      document.getElementById('btn-gmaps-acept').href=`https://www.google.com/maps/dir/?api=1&origin=${latC},${lngC}&destination=${latU},${lngU}&travelmode=driving`;
-      document.getElementById('barra-progreso').style.width=Math.max(10, 100 - kmChofer*10)+'%';
-    }
-  }catch(e){}
-}
-document.getElementById('m-cerrar').onclick=()=>document.getElementById('modal-chofer').classList.add('hidden');
-document.getElementById('m-elegir').onclick=()=>{ document.getElementById('modal-chofer').classList.add('hidden'); validarBoton(); };
+window.driverMarkers={};
 
-document.getElementById('btn-solicitar').onclick=async()=>{
-  if(!destLat||!choferSel) return;
-  const ref=await addDoc(collection(db,"viajes"),{cliente:document.getElementById('nombre').value||'Pasajero', destino:document.getElementById('destino').value, telefono:document.getElementById('tel').value, km:kmReal, tarifa_final:calcTarifa(kmReal), lat:myLat, lng:myLng, dest_lat:destLat, dest_lng:destLng, chofer_solicitado:choferSel.id, chofer_nombre:choferSel.nombre, estado:'solicitado_chofer', fecha:serverTimestamp()});
-  viajeId=ref.id;
-  document.getElementById('pantalla-normal').classList.add('hidden');
-  document.getElementById('pantalla-aceptado').classList.remove('hidden');
-  document.getElementById('acept-nombre').innerText=choferSel.nombre;
-  document.getElementById('acept-detalle').innerText=`Esperando aceptación 10s... Tarifa $${calcTarifa(kmReal)}`;
-  document.getElementById('acept-tarifa').innerText='$'+calcTarifa(kmReal); document.getElementById('acept-km').innerText=kmReal.toFixed(2)+' km';
-  let seg=10; const timer=setInterval(()=>{ seg--; document.getElementById('acept-detalle').innerText=`Esperando que ${choferSel.nombre} acepte (${seg}s)...`; if(seg<=0) clearInterval(timer); },1000);
-  unsubViaje=onSnapshot(doc(db,"viajes",viajeId), snap=>{
-    const v=snap.data(); if(!v) return;
-    if(v.estado==='aceptado'){
-      clearInterval(timer);
-      document.getElementById('acept-detalle').innerText=`✅ Viene por ti - Ruta real en mapa`;
-      document.getElementById('pantalla-aceptado').classList.remove('hidden');
-      if(routeLine) map.removeLayer(routeLine);
-      // Ahora trazar ruta real chofer->usuario
-      const choferDoc=carMarkers[choferSel.id]?.getLatLng();
-      if(choferDoc) trazarRutaChoferReal(choferDoc.lat, choferDoc.lng, myLat, myLng);
-    }
-    if(v.estado==='rechazado'){ alert('Chofer rechazó'); location.reload(); }
-    if(v.estado==='finalizado'){ alert('Viaje terminado'); location.reload(); }
-  });
+function getLocation(){return new Promise((resolve,reject)=>{if(!navigator.geolocation)return reject(Error("GPS no disponible"));navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:12000,maximumAge:10000})})}
+async function updateLocation(){try{const p=await getLocation();myLat=p.coords.latitude;myLng=p.coords.longitude;pickupMarker.setLatLng([myLat,myLng]);map.setView([myLat,myLng],16);setStatus("Ubicación actualizada.");if(destLat!==null)await selectDestination(destLat,destLng,$("destination").value)}catch{setStatus("No se pudo obtener tu ubicación. Revisa el permiso de GPS.")}}
+$("btn-my-location").onclick=updateLocation;
+$("search-destination").onclick=async()=>{
+  const q=$("destination").value.trim();if(!q)return setStatus("Escribe una dirección para buscarla.");
+  $("search-destination").disabled=true;setStatus("Buscando dirección…");
+  try{const url=`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=mx&q=${encodeURIComponent(q+", Mazatlán, Sinaloa")}`;const res=await fetch(url,{headers:{"Accept":"application/json"}});const data=await res.json();if(!data.length)throw Error("not found");await selectDestination(Number(data[0].lat),Number(data[0].lon),data[0].display_name)}
+  catch{setStatus("No encontramos esa dirección. Prueba con otra referencia o toca el mapa.")}finally{$("search-destination").disabled=false}
 };
-// CANCELAR CON CONFIRMACIÓN
-async function cancelarViaje(){
-  if(!viajeId) return;
-  if(!confirm(`¿Seguro que quieres cancelar tu viaje con ${choferSel.nombre}?\n\nTarifa: $${calcTarifa(kmReal)}`)) return;
-  await updateDoc(doc(db,"viajes",viajeId),{estado:'cancelado_cliente', fecha_cancel:serverTimestamp()});
-  alert('Viaje cancelado - Chofer notificado');
-  location.reload();
-}
-document.getElementById('btn-cancelar-acept').onclick=cancelarViaje;
-document.getElementById('btn-cancelar')?.addEventListener('click', cancelarViaje);
+$("destination").addEventListener("keydown",e=>{if(e.key==="Enter")$("search-destination").click()});
+
+$("request-ride").onclick=async()=>{
+  if(!destLat||!selectedDriver||requestBusy)return;
+  const name=$("passenger-name").value.trim(),phone=$("passenger-phone").value.trim();
+  if(!name||!phone){setStatus("Escribe tu nombre y teléfono para solicitar el viaje.");return}
+  if(!/^[+0-9\s()-]{8,20}$/.test(phone)){setStatus("Revisa el número de WhatsApp.");return}
+  requestBusy=true;setButton();
+  try{
+    const driverDoc=await getDoc(doc(db,"choferes",selectedDriver.id)),freshDriver=driverDoc.data();
+    const last=freshDriver?.lastUpdate?.toMillis?.()||0;
+    if(!driverDoc.exists()||freshDriver.online!==true||freshDriver.disponible===false||Date.now()-last>90000)throw Error("El conductor ya no está disponible. Elige otro.");
+    const ref=await addDoc(collection(db,"viajes"),{cliente:name,telefono:phone,destino:$("destination").value.trim(),km:Number(routeKm.toFixed(2)),tarifa_final:fare(routeKm),lat:myLat,lng:myLng,dest_lat:destLat,dest_lng:destLng,chofer_solicitado:selectedDriver.id,chofer_nombre:selectedDriver.nombre||"Conductor",estado:"solicitado_chofer",fecha:serverTimestamp()});
+    rideId=ref.id;$("normal-screen").classList.add("hidden");$("waiting-screen").classList.remove("hidden");$("waiting-driver").textContent=selectedDriver.nombre||"Conductor";$("waiting-fare").textContent="$"+fare(routeKm);$("waiting-distance").textContent=routeKm.toFixed(1)+" km";
+    unsubscribeRide=onSnapshot(doc(db,"viajes",rideId),snap=>{
+      if(!snap.exists())return;const v=snap.data();
+      if(v.estado==="aceptado"){$("waiting-status").textContent="¡Viaje aceptado! El conductor va hacia tu ubicación.";$("open-driver-route").classList.remove("hidden");}
+      else if(v.estado==="rechazado"||v.estado==="cancelado_chofer"){$("waiting-status").textContent="El conductor no pudo completar la solicitud. Puedes solicitar otro viaje.";$("cancel-ride").textContent="VOLVER A SOLICITAR";$("cancel-ride").onclick=()=>location.reload()}
+      else if(v.estado==="cancelado_cliente")$("waiting-status").textContent="Solicitud cancelada.";
+      else if(v.estado==="finalizado"){$("waiting-status").textContent="Viaje finalizado. ¡Gracias por viajar con VIPDRIVE!";$("cancel-ride").textContent="CERRAR";$("cancel-ride").onclick=()=>location.reload()}
+    });
+    $("open-driver-route").href=`https://www.google.com/maps/dir/?api=1&destination=${myLat},${myLng}&travelmode=driving`;
+  }catch(e){setStatus(e.message||"No se pudo enviar la solicitud. Intenta de nuevo.");requestBusy=false;setButton()}
+};
+$("cancel-ride").onclick=async()=>{if(!rideId)return;if(!confirm("¿Seguro que deseas cancelar la solicitud?"))return;try{await updateDoc(doc(db,"viajes",rideId),{estado:"cancelado_cliente",fecha_cancel:serverTimestamp()});$("waiting-status").textContent="Solicitud cancelada.";if(unsubscribeRide)unsubscribeRide();}catch{alert("No se pudo cancelar. Comprueba tu conexión.")}};
+updateLocation();
 </script>
 </body>
 </html>
