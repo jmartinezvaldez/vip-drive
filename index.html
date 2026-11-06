@@ -2,42 +2,45 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VIPDRIVE - Completo</title>
+<title>VIPDRIVE - Google Maps</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<style>#map{height:50vh;background:#222} .sheet{background:white;border-radius:28px 28px 0 0;padding:16px;color:black;min-height:50vh;overflow:auto} .car{transition: all 2s linear !important}</style>
+<style>#map{height:52vh;background:#e5e7eb} .sheet{background:white;border-radius:28px 28px 0 0;padding:16px;color:black;min-height:48vh} .car{transition: all 2s linear !important}</style>
 </head>
 <body>
-<div class="p-2 bg-black text-white flex justify-between text-[11px] fixed top-0 left-0 right-0 z-[1000]"><b>VIPDRIVE MAZATLÁN</b><span id="count">0 choferes en vivo</span><span class="text-green-400">● EN VIVO</span></div>
+<div class="p-2 bg-black text-white flex justify-between text-[11px] fixed top-0 left-0 right-0 z-[1000]"><b>VIPDRIVE • GOOGLE MAPS</b><span id="count">0 choferes</span><span id="tipo-mapa" class="bg-white text-black px-2 rounded-full font-black">SATÉLITE</span></div>
 <div id="map" style="margin-top:32px"></div>
 
 <div class="sheet">
-<!-- ESTADO VIAJE -->
-<div id="estado-viaje" class="hidden bg-purple-600 text-white p-3 rounded-xl mb-3">
+<div id="estado-viaje" class="hidden bg-green-600 text-white p-3 rounded-xl mb-3">
 <p id="estado-text" class="font-black text-sm"></p><p id="chofer-nombre" class="text-xs"></p>
-<div class="flex gap-2 mt-2"><a id="btn-gmaps-cliente" target="_blank" class="flex-1 bg-white text-purple-600 text-center py-2 rounded-full font-black text-xs">🗺️ VER CHOFER EN GOOGLE MAPS</a><button id="btn-cancelar" class="flex-1 bg-black text-white py-2 rounded-full text-xs">CANCELAR</button></div>
+<div class="flex gap-2 mt-2"><a id="btn-gmaps-cliente" target="_blank" class="flex-1 bg-white text-green-700 text-center py-2 rounded-full font-black text-xs">🗺️ NAVEGAR EN GOOGLE MAPS</a><button id="btn-cancelar" class="flex-1 bg-black text-white py-2 rounded-full text-xs">CANCELAR</button></div>
 <div class="w-full bg-black/20 h-2 rounded-full mt-2"><div id="barra-cliente" class="bg-white h-2 rounded-full" style="width:0%"></div></div>
 </div>
 
-<h1 class="font-black text-[18px] text-black">1. Toca el mapa para tu destino</h1>
-<input id="destino" class="w-full mt-2 bg-gray-100 p-3 rounded-xl text-black font-bold text-sm" placeholder="Ej: Cobaes 36, Plaza Acaya o toca el mapa">
+<div class="flex justify-between items-center"><h1 class="font-black text-[16px] text-black">Destino: toca mapa</h1><div class="flex gap-1"><button id="btn-calle" class="text-[10px] bg-black text-white px-2 py-1 rounded-full">CALLE</button><button id="btn-satelite" class="text-[10px] bg-gray-200 px-2 py-1 rounded-full">SATÉLITE</button></div></div>
+<input id="destino" class="w-full mt-2 bg-gray-100 p-3 rounded-xl text-black font-bold text-sm" placeholder="Ej: Av Camaron Sabalo 500 o toca el mapa">
 
-<h1 class="font-black text-[18px] text-black mt-3">2. Toca un carrito 🚗 para elegir chofer</h1>
-<div class="flex justify-between text-xs mt-1"><span>Distancia: <b id="km">-- km</b></span><span>Tarifa: <b id="tarifa" class="text-purple-600">$35 mínimo</b></span><span id="chofer-elegido" class="text-green-600 font-black"></span></div>
+<div class="flex justify-between items-center mt-3">
+<h1 class="font-black text-[16px] text-black">Chofer: toca carrito 🚗</h1>
+<button id="btn-deseleccionar" class="hidden bg-red-100 text-red-600 px-3 py-1 rounded-full text-[10px] font-black">✕ DESELECCIONAR CHOFER</button>
+</div>
+
+<div class="flex justify-between text-xs mt-1"><span>Dist: <b id="km">-- km</b></span><span>Tarifa: <b id="tarifa" class="text-purple-600">$35 mínimo</b></span><span id="chofer-elegido" class="text-green-600 font-black"></span></div>
 
 <div class="flex gap-2 mt-3"><input id="nombre" placeholder="Tu nombre" class="flex-1 p-3 bg-gray-100 rounded-xl text-sm text-black"><input id="tel" placeholder="WhatsApp" class="flex-1 p-3 bg-gray-100 rounded-xl text-sm text-black"></div>
 
-<button id="btn-solicitar" class="w-full mt-3 bg-gray-300 text-gray-500 py-4 rounded-full font-black" disabled>ELIGE DESTINO Y CHOFER</button>
-<p id="status" class="text-center text-xs mt-2 text-gray-500">Toca mapa = destino • Toca carrito = ver perfil chofer</p>
+<button id="btn-solicitar" class="w-full mt-3 bg-gray-300 text-gray-500 py-4 rounded-full font-black text-sm" disabled>1. TOCA MAPA Y 2. TOCA CARRITO</button>
+<p id="status" class="text-center text-[10px] mt-2 text-gray-500">Mapa Google Maps real • Carritos en tiempo real • Tarifa $10/km</p>
 </div>
 
-<!-- MODAL PERFIL DINÁMICO -->
+<!-- MODAL -->
 <div id="modal-chofer" class="hidden fixed inset-0 bg-black/70 z-[2000] flex items-end"><div class="bg-white w-full rounded-t-[32px] max-w-md mx-auto max-h-[85vh] overflow-auto">
-<div class="relative"><div class="flex overflow-x-auto"><img id="img1" class="w-full h-56 object-cover flex-shrink-0"><img id="img2" class="w-full h-56 object-cover flex-shrink-0"></div><button id="m-cerrar" class="absolute top-4 right-4 w-9 h-9 bg-black/70 text-white rounded-full">✕</button><div class="absolute bottom-3 left-4 bg-black text-white px-3 py-1 rounded-full text-xs">✅ VERIFICADO • EN VIVO</div></div>
+<div class="relative"><div class="flex overflow-x-auto"><img id="img1" class="w-full h-56 object-cover flex-shrink-0"><img id="img2" class="w-full h-56 object-cover flex-shrink-0"></div><button id="m-cerrar" class="absolute top-4 right-4 w-9 h-9 bg-black/70 text-white rounded-full">✕</button><div class="absolute bottom-3 left-4 bg-black text-white px-3 py-1 rounded-full text-xs">GOOGLE MAPS EN VIVO</div></div>
 <div class="p-5">
-<div class="flex justify-between"><div><p id="m-nombre" class="font-black text-xl text-black"></p><p class="text-yellow-500 text-xs">⭐5.0 • 150 viajes • Movíendose ahora</p><p id="m-dist" class="text-xs text-purple-600 font-bold"></p></div><a id="m-wsp" target="_blank" class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">📱</a></div>
-<div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-gray-100 rounded-xl p-2 text-center"><p class="text-[10px] text-gray-500">AUTO</p><p id="m-auto" class="font-black text-xs text-black"></p><p id="m-anio" class="text-[10px]"></p></div><div class="bg-gray-100 rounded-xl p-2 text-center"><p class="text-[10px] text-gray-500">PLACAS</p><p id="m-placas" class="font-black text-xs text-black"></p><p id="m-color" class="text-[10px]"></p></div><div class="bg-purple-50 rounded-xl p-2 text-center"><p class="text-[10px] text-purple-600">TARIFA</p><p class="font-black text-xs text-purple-600">$10/km</p><p class="text-[10px]">Min $35</p></div></div>
-<button id="m-elegir" class="w-full mt-4 bg-black text-white py-4 rounded-full font-black text-sm">ELEGIR A ESTE CHOFER</button>
+<div class="flex justify-between"><div><p id="m-nombre" class="font-black text-xl text-black"></p><p id="m-auto" class="text-sm text-gray-600"></p><p id="m-dist" class="text-xs text-purple-600 font-bold"></p></div><a id="m-wsp" target="_blank" class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">📱</a></div>
+<div class="grid grid-cols-3 gap-2 mt-3"><div class="bg-gray-100 rounded-xl p-2 text-center"><p class="text-[10px]">AUTO</p><p id="m-anio" class="font-black text-xs text-black"></p></div><div class="bg-gray-100 rounded-xl p-2 text-center"><p class="text-[10px]">PLACAS</p><p id="m-placas" class="font-black text-xs text-black"></p></div><div class="bg-purple-50 rounded-xl p-2 text-center"><p class="text-[10px]">COLOR</p><p id="m-color" class="font-black text-xs"></p></div></div>
+<div class="flex gap-2 mt-4"><button id="m-elegir" class="flex-1 bg-black text-white py-4 rounded-full font-black text-sm">ELEGIR ESTE CHOFER</button><button id="m-deseleccionar-modal" class="bg-red-100 text-red-600 px-4 rounded-full text-xs font-black">✕ QUITAR</button></div>
 </div></div></div>
 
 <script type="module">
@@ -45,44 +48,46 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFirestore, collection, addDoc, onSnapshot, doc, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
 const app = initializeApp(firebaseConfig); const db = getFirestore(app);
-let myLat=23.2329, myLng=-106.4111, destLat=null, destLng=null, kmReal=0, map, routeLine=null, carMarkers={}, choferSel=null, viajeId=null, routeChofer=null, driverLiveMarker=null;
-map=L.map('map',{zoomControl:false}).setView([myLat,myLng],14); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+let myLat=23.2329, myLng=-106.4111, destLat=null, destLng=null, kmReal=0, map, routeLine=null, carMarkers={}, choferSel=null, viajeId=null, routeChofer=null, driverLiveMarker=null, gmapsLayer, satLayer, isSatelite=true;
+map=L.map('map',{zoomControl:false}).setView([myLat,myLng],14);
+// CAPAS GOOGLE MAPS REAL
+gmapsLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {maxZoom:20, subdomains:['mt0','mt1','mt2','mt3']});
+satLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {maxZoom:20, subdomains:['mt0','mt1','mt2','mt3']});
+satLayer.addTo(map);
 function calcTarifa(k){ return Math.max(35, Math.round(k*10)); }
 function dist(a,b,c,d){ const R=6371, dLat=(c-a)*Math.PI/180, dLon=(d-b)*Math.PI/180, e=Math.sin(dLat/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(e),Math.sqrt(1-e)); }
-navigator.geolocation.getCurrentPosition(p=>{ myLat=p.coords.latitude; myLng=p.coords.longitude; map.setView([myLat,myLng],15); L.marker([myLat,myLng]).addTo(map).bindPopup("Tú - Recogida"); });
+navigator.geolocation.getCurrentPosition(p=>{ myLat=p.coords.latitude; myLng=p.coords.longitude; map.setView([myLat,myLng],16); L.marker([myLat,myLng]).addTo(map).bindPopup("Tú - Recogida"); });
 map.on('click', e=>{ destLat=e.latlng.lat; destLng=e.latlng.lng; document.getElementById('destino').value=`Destino ${destLat.toFixed(4)}, ${destLng.toFixed(4)}`; actualizarRuta(); });
 document.getElementById('destino').addEventListener('change', async ()=>{ const txt=document.getElementById('destino').value; if(txt.length<3) return; try{ const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(txt+' Mazatlán')}`); const d=await r.json(); if(d.length>0){ destLat=parseFloat(d[0].lat); destLng=parseFloat(d[0].lon); actualizarRuta(); } }catch(e){} });
-function actualizarRuta(){
-  if(!destLat) return; kmReal=dist(myLat,myLng,destLat,destLng)*1.35; if(routeLine) map.removeLayer(routeLine); routeLine=L.polyline([[myLat,myLng],[destLat,destLng]],{color:'#8B5CF6',weight:6}).addTo(map); document.getElementById('km').innerText=kmReal.toFixed(2)+' km'; document.getElementById('tarifa').innerText='$'+calcTarifa(kmReal); validarBoton();
-}
-function validarBoton(){
-  const btn=document.getElementById('btn-solicitar');
-  if(destLat && choferSel){ btn.disabled=false; btn.classList.remove('bg-gray-300','text-gray-500'); btn.classList.add('bg-black','text-white'); btn.innerText=`SOLICITAR A ${choferSel.nombre.toUpperCase()} POR $${calcTarifa(kmReal)}`; }
-  else if(!destLat){ btn.innerText='1. TOCA EL MAPA PARA DESTINO'; }
-  else if(!choferSel){ btn.innerText='2. TOCA UN CARRITO PARA ELEGIR CHOFER'; }
-}
+function actualizarRuta(){ if(!destLat) return; kmReal=dist(myLat,myLng,destLat,destLng)*1.35; if(routeLine) map.removeLayer(routeLine); routeLine=L.polyline([[myLat,myLng],[destLat,destLng]],{color:'#8B5CF6',weight:6}).addTo(map); document.getElementById('km').innerText=kmReal.toFixed(2)+' km'; document.getElementById('tarifa').innerText='$'+calcTarifa(kmReal); validarBoton(); }
+function validarBoton(){ const btn=document.getElementById('btn-solicitar'); const desel=document.getElementById('btn-deseleccionar'); if(destLat && choferSel){ btn.disabled=false; btn.classList.remove('bg-gray-300','text-gray-500'); btn.classList.add('bg-black','text-white'); btn.innerText=`SOLICITAR A ${choferSel.nombre.toUpperCase()} POR $${calcTarifa(kmReal)}`; desel.classList.remove('hidden'); document.getElementById('chofer-elegido').innerText=`✓ ${choferSel.nombre}`; } else { desel.classList.add('hidden'); document.getElementById('chofer-elegido').innerText=''; if(!destLat) btn.innerText='1. TOCA MAPA PARA DESTINO'; else btn.innerText='2. TOCA UN CARRITO PARA ELEGIR'; btn.disabled=true; btn.classList.add('bg-gray-300','text-gray-500'); btn.classList.remove('bg-black','text-white'); } }
+function deseleccionarChofer(){ choferSel=null; document.getElementById('modal-chofer').classList.add('hidden'); Object.values(carMarkers).forEach(m=>{ /* reset border */ }); validarBoton(); document.getElementById('chofer-elegido').innerText=''; document.getElementById('status').innerText='Chofer deseleccionado - toca otro carrito'; }
+document.getElementById('btn-deseleccionar').onclick=deseleccionarChofer;
+document.getElementById('m-deseleccionar-modal').onclick=deseleccionarChofer;
 
-// CARRITOS EN TIEMPO REAL
+document.getElementById('btn-calle').onclick=()=>{ map.removeLayer(satLayer); gmapsLayer.addTo(map); isSatelite=false; document.getElementById('tipo-mapa').innerText='CALLE'; };
+document.getElementById('btn-satelite').onclick=()=>{ map.removeLayer(gmapsLayer); satLayer.addTo(map); isSatelite=true; document.getElementById('tipo-mapa').innerText='SATÉLITE'; };
+
 onSnapshot(collection(db,"choferes"), snap=>{
-  const activos=snap.docs.filter(d=>d.data().lat); document.getElementById('count').innerText=activos.length+' choferes en vivo';
+  const activos=snap.docs.filter(d=>d.data().lat); document.getElementById('count').innerText=activos.length+' choferes';
   activos.forEach(doc=>{
-    const c=doc.data(); const id=doc.id; const lat=c.lat, lng=c.lng, heading=c.heading||0;
+    const c=doc.data(); const id=doc.id; const lat=c.lat, lng=c.lng;
     if(carMarkers[id]){ carMarkers[id].setLatLng([lat,lng]); }
     else {
-      const icon=L.divIcon({className:'car', html:`<div style="background:${choferSel && choferSel.id===id?'black':'white'};border:3px solid ${choferSel && choferSel.id===id?'#22c55e':'#8B5CF6'};width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 12px rgba(0,0,0,.3)">🚗</div><div style="background:black;color:white;font-size:8px;font-weight:900;padding:2px 6px;border-radius:10px;text-align:center;margin-top:2px">${c.nombre?c.nombre.split(' ')[0]:'Chofer'}</div>`, iconSize:[46,46], iconAnchor:[23,23]});
+      const isSelected=choferSel && choferSel.id===id;
+      const icon=L.divIcon({className:'car', html:`<div style="background:${isSelected?'black':'white'};border:3px solid ${isSelected?'#22c55e':'#8B5CF6'};width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 12px rgba(0,0,0,.5)">${isSelected?'✅':'🚗'}</div><div style="background:black;color:white;font-size:8px;font-weight:900;padding:2px 6px;border-radius:10px;text-align:center;margin-top:2px">${c.nombre?c.nombre.split(' ')[0]:'Chofer'}</div>`, iconSize:[48,48], iconAnchor:[24,24]});
       const m=L.marker([lat,lng],{icon}).addTo(map);
       m.on('click', ()=>{
         choferSel={id, ...c};
         document.getElementById('img1').src=c.fotoChofer||c.foto||'https://i.pravatar.cc/400?u='+id;
         document.getElementById('img2').src=c.fotoCarro||'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=400';
-        document.getElementById('m-nombre').innerText=c.nombre||'Chofer VIP'; document.getElementById('m-auto').innerText=c.auto||''; document.getElementById('m-anio').innerText=c.anio||''; document.getElementById('m-placas').innerText=c.placas||''; document.getElementById('m-color').innerText=c.color||''; document.getElementById('m-dist').innerText=`A ${dist(myLat,myLng,lat,lng).toFixed(1)} km • En vivo moviéndose`; document.getElementById('m-wsp').href=`https://wa.me/52${c.id}`;
-        document.getElementById('modal-chofer').classList.remove('hidden');
-        document.getElementById('chofer-elegido').innerText=`✓ ${c.nombre}`;
-        validarBoton();
+        document.getElementById('m-nombre').innerText=c.nombre||'Chofer VIP'; document.getElementById('m-auto').innerText=c.auto||''; document.getElementById('m-anio').innerText=c.anio||''; document.getElementById('m-placas').innerText=c.placas||''; document.getElementById('m-color').innerText=c.color||''; document.getElementById('m-dist').innerText=`A ${dist(myLat,myLng,lat,lng).toFixed(1)} km • En vivo`; document.getElementById('m-wsp').href=`https://wa.me/52${c.id}`;
+        document.getElementById('modal-chofer').classList.remove('hidden'); validarBoton();
+        // refrescar iconos
+        onSnapshot(collection(db,"choferes"),()=>{});
       });
       carMarkers[id]=m;
     }
-    // Si este chofer es el elegido y ya hay viaje aceptado, mueve ruta en vivo
     if(viajeId && choferSel && id===choferSel.id){
       if(driverLiveMarker) map.removeLayer(driverLiveMarker);
       driverLiveMarker=L.marker([lat,lng],{icon:L.divIcon({html:`<div style="background:black;color:white;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:900">🚗 ${c.nombre} viene</div>`,iconSize:[130,30]})}).addTo(map);
@@ -90,6 +95,8 @@ onSnapshot(collection(db,"choferes"), snap=>{
       document.getElementById('btn-gmaps-cliente').href=`https://www.google.com/maps/dir/?api=1&origin=${lat},${lng}&destination=${myLat},${myLng}&travelmode=driving`;
     }
   });
+  // Re-render iconos cuando se selecciona
+  if(choferSel){ Object.keys(carMarkers).forEach(k=>{ const c2=snap.docs.find(d=>d.id===k)?.data(); if(!c2) return; const isSel=k===choferSel.id; const icon=L.divIcon({className:'car', html:`<div style="background:${isSel?'black':'white'};border:3px solid ${isSel?'#22c55e':'#8B5CF6'};width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px">${isSel?'✅':'🚗'}</div><div style="background:black;color:white;font-size:8px;padding:2px 6px;border-radius:10px;text-align:center;margin-top:2px">${c2.nombre?c2.nombre.split(' ')[0]:'Chofer'}</div>`, iconSize:[48,48], iconAnchor:[24,24]}); carMarkers[k].setIcon(icon); }); }
 });
 
 document.getElementById('m-cerrar').onclick=()=>document.getElementById('modal-chofer').classList.add('hidden');
@@ -97,19 +104,12 @@ document.getElementById('m-elegir').onclick=()=>{ document.getElementById('modal
 
 document.getElementById('btn-solicitar').onclick=async()=>{
   if(!destLat||!choferSel) return;
-  const cliente=document.getElementById('nombre').value||'Pasajero', tel=document.getElementById('tel').value, destino=document.getElementById('destino').value;
-  const ref=await addDoc(collection(db,"viajes"),{cliente,destino,telefono:tel,km:kmReal,tarifa_final:calcTarifa(kmReal),lat:myLat,lng:myLng,dest_lat:destLat,dest_lng:destLng,chofer_solicitado:choferSel.id,chofer_nombre:choferSel.nombre,estado:'solicitado_chofer',fecha:serverTimestamp()});
-  viajeId=ref.id;
-  document.getElementById('estado-viaje').classList.remove('hidden');
-  document.getElementById('estado-text').innerText=`Esperando que ${choferSel.nombre} acepte (10s)...`;
-  let seg=10; const timer=setInterval(()=>{ seg--; document.getElementById('estado-text').innerText=`Esperando que ${choferSel.nombre} acepte (${seg}s)...`; document.getElementById('barra-cliente').style.width=(10-seg)*10+'%'; if(seg<=0) clearInterval(timer); },1000);
-  onSnapshot(doc(db,"viajes",viajeId), snap=>{
-    const v=snap.data(); if(!v) return;
-    if(v.estado==='aceptado'){ clearInterval(timer); document.getElementById('estado-viaje').classList.remove('bg-purple-600'); document.getElementById('estado-viaje').classList.add('bg-green-600'); document.getElementById('estado-text').innerText=`✅ ${v.chofer_nombre} aceptó - Viene por ti`; document.getElementById('chofer-nombre').innerText=`Te ve en mapa moviéndose en vivo`; document.getElementById('barra-cliente').style.width='100%'; document.getElementById('btn-solicitar').innerText='CHOFER EN CAMINO - TOCA PARA VER EN GOOGLE MAPS'; document.getElementById('btn-solicitar').onclick=()=>{ window.open(document.getElementById('btn-gmaps-cliente').href,'_blank'); }; }
-    if(v.estado==='rechazado'){ document.getElementById('estado-text').innerText=`❌ ${choferSel.nombre} rechazó - Elige otro carrito`; document.getElementById('estado-viaje').classList.add('bg-red-600'); }
-  });
+  const ref=await addDoc(collection(db,"viajes"),{cliente:document.getElementById('nombre').value||'Pasajero', destino:document.getElementById('destino').value, telefono:document.getElementById('tel').value, km:kmReal, tarifa_final:calcTarifa(kmReal), lat:myLat, lng:myLng, dest_lat:destLat, dest_lng:destLng, chofer_solicitado:choferSel.id, chofer_nombre:choferSel.nombre, estado:'solicitado_chofer', fecha:serverTimestamp()});
+  viajeId=ref.id; document.getElementById('estado-viaje').classList.remove('hidden'); document.getElementById('estado-text').innerText=`Esperando ${choferSel.nombre} (10s)...`;
+  let seg=10; const timer=setInterval(()=>{ seg--; document.getElementById('estado-text').innerText=`Esperando ${choferSel.nombre} (${seg}s)...`; document.getElementById('barra-cliente').style.width=(10-seg)*10+'%'; if(seg<=0) clearInterval(timer); },1000);
+  onSnapshot(doc(db,"viajes",viajeId), snap=>{ const v=snap.data(); if(!v) return; if(v.estado==='aceptado'){ clearInterval(timer); document.getElementById('estado-text').innerText=`✅ ${v.chofer_nombre} aceptó - Viene por ti en vivo`; document.getElementById('barra-cliente').style.width='100%'; } if(v.estado==='rechazado'){ document.getElementById('estado-text').innerText=`❌ Rechazó - Elige otro`; } });
 };
-document.getElementById('btn-cancelar').onclick=async()=>{ if(viajeId) await updateDoc(doc(db,"viajes",viajeId),{estado:'cancelado_cliente'}); location.reload(); };
+document.getElementById('btn-cancelar').onclick=async()=>{ if(viajeId) await updateDoc(doc(db,"viajes",viajeId),{estado:'cancelado'}); location.reload(); };
 </script>
 </body>
 </html>
