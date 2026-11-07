@@ -372,17 +372,22 @@
         // Modo de asignación, perfil del conductor y carritos en vivo
         function setMode(m) { mode = m; $("mode-pick").classList.toggle("on", m === "pick"); $("mode-auto").classList.toggle("on", m === "auto"); $("mode-pick").setAttribute("aria-pressed", m === "pick"); $("mode-auto").setAttribute("aria-pressed", m === "auto"); $("pick-driver").classList.toggle("hidden", m === "auto"); $("auto-note").classList.toggle("hidden", m !== "auto"); if (m === "auto") { selectedDriver = null; $("selected-driver-label").textContent = "" } renderDrivers() }
         $("mode-pick").onclick = () => setMode("pick"); $("mode-auto").onclick = () => setMode("auto");
-        function photosOf(d) { const a = Array.isArray(d.fotos) ? d.fotos.filter(Boolean) : []; if (!a.length && d.foto) a.push(d.foto); return a }
+        function photosOf(d) { const p = d.thumb || d.foto; return p ? [p] : [] }
         function makeCar(id, d) {
             const m = L.marker([d.lat, d.lng], { icon: L.divIcon({ className: "", html: `<div class="driver-icon ${selectedDriver?.id === id ? "selected" : ""}">🚗</div>`, iconSize: [42, 42], iconAnchor: [21, 21] }), title: d.nombre || "Conductor" }).addTo(map);
             m.on("click", () => openProfile(id)); setTimeout(() => m.getElement()?.classList.add("vd-car"), 80); return m;
         }
         let profileId = null;
-        function openProfile(id) {
-            const d = drivers.get(id); if (!d) return; profileId = id; const ph = photosOf(d), box = $("pf-photos"); box.replaceChildren();
+        const photoCache = new Map();
+        function paintPhotos(d, ph) {
+            const box = $("pf-photos"); box.replaceChildren();
             if (!ph.length) { const e = document.createElement("div"); e.className = "w-full h-48 rounded-2xl bg-violet-50 grid place-items-center text-6xl"; e.textContent = "🚗"; box.append(e) }
-            ph.forEach(u => { const im = new Image(); im.src = u; im.alt = "Foto de " + (d.nombre || "conductor"); im.loading = "lazy"; im.className = "snap-center shrink-0 w-full h-56 object-cover rounded-2xl bg-gray-100"; box.append(im) });
+            ph.forEach(u => { const im = new Image(); im.src = u; im.alt = "Foto de " + (d.nombre || "conductor"); im.className = "snap-center shrink-0 w-full h-56 object-cover rounded-2xl bg-gray-100"; box.append(im) });
             $("pf-count").textContent = ph.length > 1 ? `Desliza para ver las ${ph.length} fotos` : "";
+        }
+        function openProfile(id) {
+            const d = drivers.get(id); if (!d) return; profileId = id; paintPhotos(d, photoCache.get(id) || photosOf(d));
+            if (!photoCache.has(id)) { $("pf-count").textContent = "Cargando fotos…"; getDoc(doc(db, "fotos_choferes", id)).then(s => { const f = s.exists() ? (s.data().fotos || []).filter(Boolean) : []; if (f.length) photoCache.set(id, f); if (profileId === id) paintPhotos(d, f.length ? f : photosOf(d)) }).catch(() => { if (profileId === id) paintPhotos(d, photosOf(d)) }) }
             $("pf-name").textContent = d.nombre || "Conductor"; $("pf-car").textContent = d.auto || "Vehículo registrado"; $("pf-plate").textContent = d.placas || "—";
             $("pf-dist").textContent = Number.isFinite(d.lat) ? distanceKm(myLat, myLng, d.lat, d.lng).toFixed(1) + " km" : "—";
             $("pf-select").classList.toggle("hidden", !!rideId); $("pf-select").textContent = selectedDriver?.id === id ? "Quitar selección" : `Enviar mi viaje a ${(d.nombre || "este conductor").split(" ")[0]}`;
