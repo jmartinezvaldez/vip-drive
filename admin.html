@@ -1,23 +1,106 @@
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin Choferes</title><script src="https://cdn.tailwindcss.com"></script></head>
-<body class="bg-black text-white p-4 max-w-md mx-auto">
-<h1 class="text-2xl font-black">REGISTRO ÚNICO CHOFERES</h1><p class="text-xs text-gray-400">Solo tú con contraseña</p>
-<input id="pass" type="password" placeholder="Contraseña: vip2026" class="w-full mt-4 p-3 rounded-xl bg-zinc-900 border">
-<div id="form" class="hidden mt-4 bg-zinc-900 rounded-2xl p-4 space-y-2">
-<input id="id" placeholder="WhatsApp ID Ej: 6691234567" class="w-full p-3 rounded-xl bg-black border">
-<input id="nombre" placeholder="Nombre completo" class="w-full p-3 rounded-xl bg-black border">
-<input id="auto" placeholder="Auto Ej: Versa Blanco 2020" class="w-full p-3 rounded-xl bg-black border">
-<input id="placas" placeholder="Placas" class="w-full p-3 rounded-xl bg-black border">
-<input id="foto" placeholder="Link foto" class="w-full p-3 rounded-xl bg-black border">
-<button id="crear" class="w-full bg-purple-600 py-3 rounded-xl font-black">CREAR CHOFER</button>
-<p id="status" class="text-xs text-center text-green-400"></p>
-<div id="lista" class="mt-4 space-y-2"></div>
-</div>
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, setDoc, collection, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
-const app = initializeApp(firebaseConfig); const db = getFirestore(app);
-document.getElementById('pass').oninput=(e)=>{ if(e.target.value==='vip2026') document.getElementById('form').classList.remove('hidden'); };
-document.getElementById('crear').onclick=async()=>{ const id=document.getElementById('id').value, nombre=document.getElementById('nombre').value, auto=document.getElementById('auto').value, placas=document.getElementById('placas').value, foto=document.getElementById('foto').value; if(!id||!nombre) return alert('Falta ID'); await setDoc(doc(db,"choferes",id),{id,nombre,auto,placas,foto,aprobado:true,disponible:true,registro_unico:true,fecha_registro:serverTimestamp()}); document.getElementById('status').innerText='✅ Creado: chofer.html?id='+id; };
-onSnapshot(collection(db,"choferes"), snap=>{ document.getElementById('lista').innerHTML=snap.docs.map(d=>{ const c=d.data(); return `<div class="bg-black p-3 rounded-xl flex gap-2"><img src="${c.foto||'https://i.pravatar.cc/100?u='+c.id}" class="w-12 h-12 rounded-full"><div><p class="font-bold text-sm">${c.nombre}</p><p class="text-xs text-gray-400">${c.auto} • ID:${c.id}</p><p class="text-xs text-purple-400">chofer.html?id=${c.id}</p></div></div>`; }).join(''); });
-</script></body></html>
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#10131b">
+    <meta name="robots" content="noindex,nofollow">
+    <title>VIPDRIVE | Administración</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚘</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="vipdrive.css">
+</head>
+
+<body class="vd-admin text-white p-4 max-w-md mx-auto">
+    <header class="pt-2">
+        <p class="font-extrabold tracking-wider text-violet-300">VIPDRIVE</p>
+        <h1 class="text-2xl font-extrabold mt-1">Registro único de choferes</h1>
+        <p class="text-xs text-gray-400 mt-1">Acceso solo con contraseña.</p>
+    </header>
+
+    <input id="pass" type="password" autocomplete="off" aria-label="Contraseña de administrador"
+        placeholder="Contraseña de administrador"
+        class="w-full mt-4 p-3 rounded-xl bg-zinc-900 border border-white/10 focus:border-violet-400 outline-none text-base">
+
+    <div id="form" class="hidden mt-4 bg-zinc-900/80 border border-white/10 rounded-2xl p-4 space-y-2">
+        <input id="id" inputmode="numeric" autocomplete="off" placeholder="WhatsApp ID. Ej: 6691234567"
+            aria-label="WhatsApp ID" class="w-full p-3 rounded-xl bg-black/60 border border-white/10 focus:border-violet-400 outline-none text-base">
+        <input id="nombre" autocomplete="off" placeholder="Nombre completo" aria-label="Nombre completo"
+            class="w-full p-3 rounded-xl bg-black/60 border border-white/10 focus:border-violet-400 outline-none text-base">
+        <div class="grid grid-cols-2 gap-2">
+            <input id="auto" autocomplete="off" placeholder="Auto. Ej: Versa Blanco 2020" aria-label="Auto"
+                class="w-full p-3 rounded-xl bg-black/60 border border-white/10 focus:border-violet-400 outline-none text-base">
+            <input id="placas" autocomplete="off" placeholder="Placas" aria-label="Placas"
+                class="w-full p-3 rounded-xl bg-black/60 border border-white/10 focus:border-violet-400 outline-none text-base">
+        </div>
+        <input id="foto" type="url" autocomplete="off" placeholder="Link de la foto" aria-label="Link de la foto"
+            class="w-full p-3 rounded-xl bg-black/60 border border-white/10 focus:border-violet-400 outline-none text-base">
+        <button id="crear"
+            class="w-full py-3 rounded-xl font-extrabold bg-gradient-to-br from-[#8a6dff] to-[#5b3fe0] disabled:opacity-50">CREAR CHOFER</button>
+        <p id="status" role="status" class="text-xs text-center text-green-400 min-h-[1rem]"></p>
+    </div>
+
+    <section id="registrados" class="hidden mt-5">
+        <h2 class="font-extrabold">Conductores registrados <span id="total" class="text-gray-400 font-medium"></span></h2>
+        <div id="lista" class="mt-2 space-y-2"></div>
+    </section>
+
+    <nav class="vd-nav mt-6" aria-label="Secciones de VIPDRIVE">
+        <a href="index.html">Pedir viaje</a>
+        <a href="chofer.html">Soy conductor</a>
+        <a href="admin.html" aria-current="page">Admin</a>
+    </nav>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, collection, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
+        const app = initializeApp(firebaseConfig); const db = getFirestore(app);
+        const $ = id => document.getElementById(id);
+        const esc = s => String(s ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+        let known = new Set();
+
+        $("pass").oninput = e => {
+            if (e.target.value === "vip2026") { $("form").classList.remove("hidden"); $("registrados").classList.remove("hidden"); }
+        };
+
+        $("crear").onclick = async () => {
+            const id = $("id").value.trim(), nombre = $("nombre").value.trim(), auto = $("auto").value.trim(), placas = $("placas").value.trim(), foto = $("foto").value.trim();
+            const status = $("status");
+            if (!id || !nombre) return alert("Falta el ID o el nombre del chofer.");
+            if (!/^[A-Za-z0-9_-]+$/.test(id)) return alert("El ID solo puede tener letras, números, guion o guion bajo.");
+            if (known.has(id) && !confirm("Ya existe un chofer con ese ID. ¿Reemplazar sus datos?")) return;
+            $("crear").disabled = true; status.className = "text-xs text-center text-gray-400 min-h-[1rem]"; status.textContent = "Guardando…";
+            try {
+                await setDoc(doc(db, "choferes", id), { id, nombre, auto, placas, foto, aprobado: true, disponible: true, registro_unico: true, fecha_registro: serverTimestamp() });
+                status.className = "text-xs text-center text-green-400 min-h-[1rem]";
+                status.innerHTML = `✅ Creado: <a class="underline" href="chofer.html?id=${encodeURIComponent(id)}">chofer.html?id=${esc(id)}</a>`;
+                ["id", "nombre", "auto", "placas", "foto"].forEach(k => $(k).value = "");
+            } catch (e) {
+                console.error(e); status.className = "text-xs text-center text-red-400 min-h-[1rem]";
+                status.textContent = "No se pudo guardar. Revisa tu conexión y las reglas de Firestore.";
+            } finally { $("crear").disabled = false; }
+        };
+
+        onSnapshot(collection(db, "choferes"), snap => {
+            known = new Set(snap.docs.map(d => d.id));
+            const now = Date.now();
+            $("total").textContent = snap.size ? `(${snap.size})` : "";
+            if (snap.empty) { $("lista").innerHTML = '<p class="text-xs text-gray-400 bg-zinc-900/80 rounded-xl p-3">Aún no hay conductores. Crea el primero arriba.</p>'; return; }
+            $("lista").innerHTML = snap.docs.map(d => d.data()).sort((a, b) => String(a.nombre).localeCompare(String(b.nombre))).map(c => {
+                const live = c.online === true && (c.lastUpdate?.toMillis?.() || 0) > now - 90000;
+                return `<a href="chofer.html?id=${encodeURIComponent(c.id)}" class="vd-row flex gap-3 items-center rounded-2xl bg-black/40 border border-white/10 p-3">
+<img src="${esc(c.foto || "https://i.pravatar.cc/100?u=" + encodeURIComponent(c.id))}" data-id="${esc(c.id)}" alt="" loading="lazy" class="w-12 h-12 rounded-full object-cover bg-zinc-800">
+<div class="min-w-0 flex-1"><p class="font-bold text-sm truncate">${esc(c.nombre)}</p><p class="text-xs text-gray-400 truncate">${esc(c.auto)}${c.placas ? " · " + esc(c.placas) : ""} · ID: ${esc(c.id)}</p><p class="text-xs text-violet-300">chofer.html?id=${esc(c.id)}</p></div>
+<span class="text-[10px] rounded-full px-2 py-1 ${live ? "bg-green-700 text-white" : "bg-zinc-800 text-gray-400"}">${live ? "En línea" : "Sin conexión"}</span></a>`;
+            }).join("");
+            $("lista").querySelectorAll("img").forEach(i => i.onerror = () => { i.onerror = null; i.src = "https://i.pravatar.cc/100?u=" + encodeURIComponent(i.dataset.id); });
+        }, e => console.error(e));
+    </script>
+</body>
+
+</html>
