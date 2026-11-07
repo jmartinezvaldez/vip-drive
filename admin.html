@@ -22,25 +22,25 @@
         <p class="text-xs text-gray-400 mt-1">Acceso solo con contraseña.</p>
     </header>
 
-    <input id="pass" type="password" autocomplete="off" aria-label="Contraseña de administrador"
-        placeholder="Contraseña de administrador"
+    <input id="pass" type="password" autocomplete="off" aria-label="Contraseña de administrador" placeholder="Contraseña de administrador"
         class="w-full mt-4 p-3 rounded-xl bg-zinc-900 border border-white/10 focus:border-violet-400 outline-none text-base">
 
     <div id="form" class="hidden mt-4 bg-zinc-900/80 border border-white/10 rounded-2xl p-4 space-y-2">
-        <input id="id" inputmode="numeric" autocomplete="off" placeholder="WhatsApp ID. Ej: 6691234567"
-            aria-label="WhatsApp ID" class="w-full p-3 rounded-xl bg-black/60 border border-white/10 focus:border-violet-400 outline-none text-base">
-        <input id="nombre" autocomplete="off" placeholder="Nombre completo" aria-label="Nombre completo"
-            class="w-full p-3 rounded-xl bg-black/60 border border-white/10 focus:border-violet-400 outline-none text-base">
-        <div class="grid grid-cols-2 gap-2">
-            <input id="auto" autocomplete="off" placeholder="Auto. Ej: Versa Blanco 2020" aria-label="Auto"
-                class="w-full p-3 rounded-xl bg-black/60 border border-white/10 focus:border-violet-400 outline-none text-base">
-            <input id="placas" autocomplete="off" placeholder="Placas" aria-label="Placas"
-                class="w-full p-3 rounded-xl bg-black/60 border border-white/10 focus:border-violet-400 outline-none text-base">
+        <div class="flex items-center justify-between">
+            <h2 id="form-title" class="font-extrabold">Nuevo chofer</h2>
+            <button id="cancelar" type="button" class="hidden text-xs text-violet-300 underline">Cancelar edición</button>
         </div>
-        <input id="foto" type="url" autocomplete="off" placeholder="Link de la foto" aria-label="Link de la foto"
-            class="w-full p-3 rounded-xl bg-black/60 border border-white/10 focus:border-violet-400 outline-none text-base">
-        <button id="crear"
-            class="w-full py-3 rounded-xl font-extrabold bg-gradient-to-br from-[#8a6dff] to-[#5b3fe0] disabled:opacity-50">CREAR CHOFER</button>
+        <input id="nombre" autocomplete="off" placeholder="Nombre completo" aria-label="Nombre completo" class="vd-in">
+        <input id="celular" inputmode="tel" autocomplete="off" placeholder="Celular (10 dígitos). Ej: 6691234567" aria-label="Celular" class="vd-in">
+        <div class="grid grid-cols-2 gap-2">
+            <input id="auto" autocomplete="off" placeholder="Modelo. Ej: Kia Rio blanco" aria-label="Modelo de auto" class="vd-in">
+            <input id="placas" autocomplete="off" placeholder="Placas" aria-label="Placas" class="vd-in">
+        </div>
+        <div>
+            <p class="text-xs text-gray-400 mb-1">Fotos del conductor y del auto (hasta 5). La primera es la principal.</p>
+            <div id="slots" class="grid grid-cols-5 gap-2"></div>
+        </div>
+        <button id="crear" class="w-full py-3 rounded-xl font-extrabold bg-gradient-to-br from-[#8a6dff] to-[#5b3fe0] disabled:opacity-50">CREAR CHOFER</button>
         <p id="status" role="status" class="text-xs text-center text-green-400 min-h-[1rem]"></p>
     </div>
 
@@ -58,48 +58,91 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getFirestore, doc, setDoc, collection, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getStorage, ref as sref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
         const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
-        const app = initializeApp(firebaseConfig); const db = getFirestore(app);
+        const app = initializeApp(firebaseConfig), db = getFirestore(app), storage = getStorage(app);
         const $ = id => document.getElementById(id);
         const esc = s => String(s ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
-        let known = new Set();
+        const MAX = 5, FIELDS = ["nombre", "celular", "auto", "placas"];
+        let slots = Array(MAX).fill(null), editingId = null, cache = new Map();
+        const say = (msg, color = "green") => { $("status").className = `text-xs text-center text-${color}-400 min-h-[1rem]`; $("status").innerHTML = msg };
+        const photosOf = c => (Array.isArray(c.fotos) ? c.fotos.filter(Boolean) : []).concat(!Array.isArray(c.fotos) && c.foto ? [c.foto] : []);
 
-        $("pass").oninput = e => {
-            if (e.target.value === "vip2026") { $("form").classList.remove("hidden"); $("registrados").classList.remove("hidden"); }
-        };
+        $("pass").oninput = e => { if (e.target.value === "vip2026") { $("form").classList.remove("hidden"); $("registrados").classList.remove("hidden"); } };
+
+        function renderSlots() {
+            $("slots").innerHTML = slots.map((s, i) => `<div class="relative aspect-square"><label class="block w-full h-full rounded-xl border border-dashed border-white/20 bg-black/50 overflow-hidden cursor-pointer grid place-items-center text-[10px] text-gray-400 text-center focus-within:border-violet-400">${s ? `<img src="${esc(s.prev || s.url)}" alt="Foto ${i + 1}" class="w-full h-full object-cover">` : `<span>+<br>${i ? "Foto " + (i + 1) : "Principal"}</span>`}<input type="file" accept="image/*" data-slot="${i}" class="sr-only"></label>${s ? `<button type="button" data-rm="${i}" aria-label="Quitar foto ${i + 1}" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-[11px] leading-none">×</button>` : ""}</div>`).join("");
+        }
+        $("slots").addEventListener("change", e => {
+            const i = e.target.dataset.slot, f = e.target.files?.[0]; if (i === undefined || !f) return;
+            if (!f.type.startsWith("image/")) return alert("Elige un archivo de imagen.");
+            slots[i] = { file: f, prev: URL.createObjectURL(f) }; renderSlots();
+        });
+        $("slots").addEventListener("click", e => { const i = e.target.dataset?.rm; if (i !== undefined) { slots[i] = null; renderSlots(); } });
+
+        async function shrink(file) {
+            const bmp = await createImageBitmap(file), k = Math.min(1, 1000 / Math.max(bmp.width, bmp.height)), c = document.createElement("canvas");
+            c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k); c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+            return new Promise(r => c.toBlob(r, "image/jpeg", .82));
+        }
+        async function upload(id, file, n) {
+            const r = sref(storage, `choferes/${id}/foto${n}_${Date.now()}.jpg`);
+            await uploadBytes(r, await shrink(file), { contentType: "image/jpeg" }); return getDownloadURL(r);
+        }
+
+        function resetForm() {
+            editingId = null; FIELDS.forEach(k => $(k).value = ""); slots = Array(MAX).fill(null); renderSlots();
+            $("form-title").textContent = "Nuevo chofer"; $("crear").textContent = "CREAR CHOFER"; $("cancelar").classList.add("hidden");
+        }
+        function editDriver(id) {
+            const c = cache.get(id); if (!c) return;
+            resetForm(); editingId = id; $("nombre").value = c.nombre || ""; $("celular").value = c.celular || c.id || ""; $("auto").value = c.auto || ""; $("placas").value = c.placas || "";
+            photosOf(c).slice(0, MAX).forEach((url, i) => slots[i] = { url }); renderSlots();
+            $("form-title").textContent = "Editando a " + (c.nombre || id); $("crear").textContent = "GUARDAR CAMBIOS"; $("cancelar").classList.remove("hidden");
+            say(""); $("form").scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        $("cancelar").onclick = () => { resetForm(); say(""); };
+        $("lista").addEventListener("click", e => { const b = e.target.closest("[data-edit]"); if (b) editDriver(b.dataset.edit); });
 
         $("crear").onclick = async () => {
-            const id = $("id").value.trim(), nombre = $("nombre").value.trim(), auto = $("auto").value.trim(), placas = $("placas").value.trim(), foto = $("foto").value.trim();
-            const status = $("status");
-            if (!id || !nombre) return alert("Falta el ID o el nombre del chofer.");
-            if (!/^[A-Za-z0-9_-]+$/.test(id)) return alert("El ID solo puede tener letras, números, guion o guion bajo.");
-            if (known.has(id) && !confirm("Ya existe un chofer con ese ID. ¿Reemplazar sus datos?")) return;
-            $("crear").disabled = true; status.className = "text-xs text-center text-gray-400 min-h-[1rem]"; status.textContent = "Guardando…";
+            const nombre = $("nombre").value.trim(), celular = $("celular").value.replace(/\D/g, ""), auto = $("auto").value.trim(), placas = $("placas").value.trim().toUpperCase();
+            const id = editingId || celular;
+            if (!nombre || !celular) return alert("Falta el nombre o el celular del chofer.");
+            if (celular.length < 10) return alert("El celular debe tener 10 dígitos.");
+            if (!slots.some(Boolean)) return alert("Agrega al menos una foto.");
+            if (!editingId && cache.has(id) && !confirm("Ya existe un chofer con ese celular. ¿Reemplazar sus datos?")) return;
+            $("crear").disabled = true;
             try {
-                await setDoc(doc(db, "choferes", id), { id, nombre, auto, placas, foto, aprobado: true, disponible: true, registro_unico: true, fecha_registro: serverTimestamp() });
-                status.className = "text-xs text-center text-green-400 min-h-[1rem]";
-                status.innerHTML = `✅ Creado: <a class="underline" href="chofer.html?id=${encodeURIComponent(id)}">chofer.html?id=${esc(id)}</a>`;
-                ["id", "nombre", "auto", "placas", "foto"].forEach(k => $(k).value = "");
-            } catch (e) {
-                console.error(e); status.className = "text-xs text-center text-red-400 min-h-[1rem]";
-                status.textContent = "No se pudo guardar. Revisa tu conexión y las reglas de Firestore.";
-            } finally { $("crear").disabled = false; }
+                const total = slots.filter(s => s?.file).length; let n = 0; const fotos = [];
+                for (let i = 0; i < MAX; i++) {
+                    const s = slots[i]; if (!s) continue;
+                    if (s.file) { say(`Subiendo fotos ${++n}/${total}…`, "gray"); fotos.push(await upload(id, s.file, i + 1)); } else fotos.push(s.url);
+                }
+                const data = { id, nombre, celular, auto, placas, fotos, foto: fotos[0], aprobado: true };
+                if (!editingId) Object.assign(data, { disponible: true, registro_unico: true, fecha_registro: serverTimestamp() });
+                await setDoc(doc(db, "choferes", id), data, { merge: true });
+                say(`✅ ${editingId ? "Cambios guardados" : "Creado"}: <a class="underline" href="chofer.html?id=${encodeURIComponent(id)}">chofer.html?id=${esc(id)}</a>`);
+                resetForm();
+            } catch (e) { console.error(e); say("No se pudo guardar. Revisa tu conexión y las reglas de Firestore y Storage.", "red"); }
+            finally { $("crear").disabled = false; }
         };
 
         onSnapshot(collection(db, "choferes"), snap => {
-            known = new Set(snap.docs.map(d => d.id));
-            const now = Date.now();
+            const now = Date.now(); cache = new Map(snap.docs.map(d => [d.id, { ...d.data(), id: d.data().id || d.id }]));
             $("total").textContent = snap.size ? `(${snap.size})` : "";
             if (snap.empty) { $("lista").innerHTML = '<p class="text-xs text-gray-400 bg-zinc-900/80 rounded-xl p-3">Aún no hay conductores. Crea el primero arriba.</p>'; return; }
-            $("lista").innerHTML = snap.docs.map(d => d.data()).sort((a, b) => String(a.nombre).localeCompare(String(b.nombre))).map(c => {
-                const live = c.online === true && (c.lastUpdate?.toMillis?.() || 0) > now - 90000;
-                return `<a href="chofer.html?id=${encodeURIComponent(c.id)}" class="vd-row flex gap-3 items-center rounded-2xl bg-black/40 border border-white/10 p-3">
-<img src="${esc(c.foto || "https://i.pravatar.cc/100?u=" + encodeURIComponent(c.id))}" data-id="${esc(c.id)}" alt="" loading="lazy" class="w-12 h-12 rounded-full object-cover bg-zinc-800">
-<div class="min-w-0 flex-1"><p class="font-bold text-sm truncate">${esc(c.nombre)}</p><p class="text-xs text-gray-400 truncate">${esc(c.auto)}${c.placas ? " · " + esc(c.placas) : ""} · ID: ${esc(c.id)}</p><p class="text-xs text-violet-300">chofer.html?id=${esc(c.id)}</p></div>
-<span class="text-[10px] rounded-full px-2 py-1 ${live ? "bg-green-700 text-white" : "bg-zinc-800 text-gray-400"}">${live ? "En línea" : "Sin conexión"}</span></a>`;
+            $("lista").innerHTML = [...cache.values()].sort((a, b) => String(a.nombre).localeCompare(String(b.nombre))).map(c => {
+                const live = c.online === true && (c.lastUpdate?.toMillis?.() || 0) > now - 90000, ph = photosOf(c);
+                return `<div class="vd-row flex gap-3 items-center rounded-2xl bg-black/40 border border-white/10 p-3">
+<img src="${esc(ph[0] || "https://i.pravatar.cc/100?u=" + encodeURIComponent(c.id))}" data-id="${esc(c.id)}" alt="" loading="lazy" class="w-12 h-12 rounded-full object-cover bg-zinc-800">
+<div class="min-w-0 flex-1"><p class="font-bold text-sm truncate">${esc(c.nombre)}</p><p class="text-xs text-gray-400 truncate">${esc(c.auto)}${c.placas ? " · " + esc(c.placas) : ""}</p><p class="text-xs text-gray-500 truncate">${esc(c.celular || c.id)} · ${ph.length} foto${ph.length === 1 ? "" : "s"}</p>
+<a class="text-xs text-violet-300 underline" href="chofer.html?id=${encodeURIComponent(c.id)}">Abrir panel</a></div>
+<div class="flex flex-col items-end gap-2"><span class="text-[10px] rounded-full px-2 py-1 ${live ? "bg-green-700 text-white" : "bg-zinc-800 text-gray-400"}">${live ? "En línea" : "Sin conexión"}</span>
+<button type="button" data-edit="${esc(c.id)}" class="text-xs font-bold rounded-lg bg-violet-600/30 text-violet-200 px-3 py-1.5">Editar</button></div></div>`;
             }).join("");
             $("lista").querySelectorAll("img").forEach(i => i.onerror = () => { i.onerror = null; i.src = "https://i.pravatar.cc/100?u=" + encodeURIComponent(i.dataset.id); });
         }, e => console.error(e));
+        renderSlots();
     </script>
 </body>
 
