@@ -54,3 +54,14 @@ button:disabled { cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Campos de formulario (admin) */
+.vd-in { width: 100%; padding: 12px; border-radius: 12px; background: #00000099; border: 1px solid #ffffff1a; outline: none; font-size: 16px; color: #fff; }
+.vd-in:focus { border-color: #a78bfa; }
+
+/* Pasajero: selector de modo, carritos en vivo y perfil del conductor */
+.vd-mode { padding: 10px; border-radius: 12px; font-weight: 700; font-size: 13px; color: #687080; }
+.vd-mode.on { background: #fff; color: var(--vd-violet-deep); box-shadow: 0 2px 8px #10131b1a; }
+.vd-car { transition: transform 1.2s linear; cursor: pointer; } /* el carrito se desliza entre posiciones GPS */
+.vd-sheet { animation: vd-up .25s ease-out; }
+@keyframes vd-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
