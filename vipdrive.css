@@ -62,6 +62,6 @@ button:disabled { cursor: not-allowed; }
 /* Pasajero: selector de modo, carritos en vivo y perfil del conductor */
 .vd-mode { padding: 10px; border-radius: 12px; font-weight: 700; font-size: 13px; color: #687080; }
 .vd-mode.on { background: #fff; color: var(--vd-violet-deep); box-shadow: 0 2px 8px #10131b1a; }
-.vd-car { transition: transform 1.2s linear; cursor: pointer; } /* el carrito se desliza entre posiciones GPS */
+.vd-car { transition: transform 9s linear; cursor: pointer; } /* el carrito se desliza entre posiciones GPS */
 .vd-sheet { animation: vd-up .25s ease-out; }
 @keyframes vd-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
