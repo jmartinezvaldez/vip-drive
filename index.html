@@ -229,6 +229,13 @@
                     </div>
                     <p id="waiting-status" class="text-xs text-violet-700 font-bold mt-4">Notificando al conductor…</p>
                 </div>
+                <div id="rating-box" class="hidden mt-4 text-center">
+                    <p id="rate-title" class="font-black text-lg">¿Cómo estuvo tu viaje?</p>
+                    <div id="stars" class="flex justify-center gap-1 mt-2" role="radiogroup" aria-label="Calificación de 1 a 5 estrellas"></div>
+                    <textarea id="rate-comment" rows="3" maxlength="300" class="field mt-3 w-full" placeholder="Comentario (opcional)"></textarea>
+                    <button id="rate-send" type="button" class="primary mt-3" disabled>ENVIAR CALIFICACIÓN</button>
+                    <button id="rate-skip" type="button" class="secondary w-full mt-2">Omitir</button>
+                </div>
                 <a id="open-driver-route" class="secondary block text-center mt-3 hidden" target="_blank"
                     rel="noopener">Ver ubicación del conductor</a>
                 <button id="cancel-ride" class="w-full mt-3 rounded-xl bg-red-50 text-red-700 py-3 font-black">CANCELAR
@@ -255,7 +262,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, serverTimestamp, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, serverTimestamp, updateDoc, getDoc, increment } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
         const app = initializeApp(firebaseConfig), db = getFirestore(app);
@@ -263,7 +270,7 @@
         const store = { get(k) { try { return localStorage.getItem(k) || "" } catch { return "" } }, set(k, v) { try { localStorage.setItem(k, v) } catch { } } };
         const DEFAULT = { lat: 23.2329, lng: -106.4111 };
         let myLat = DEFAULT.lat, myLng = DEFAULT.lng, destLat = null, destLng = null, routeKm = 0, map, routeLine = null, pickupMarker = null, destinationMarker = null;
-        let mode = "pick", rideCancelled = false, drivers = new Map(), selectedDriver = null, rideId = null, unsubscribeRide = null, unsubscribeDrivers = null, requestBusy = false, lastRouteAt = 0;
+        let mode = "pick", rideCancelled = false, arrivedNotified = false, ratingShown = false, drivers = new Map(), selectedDriver = null, rideId = null, unsubscribeRide = null, unsubscribeDrivers = null, requestBusy = false, lastRouteAt = 0;
 
         map = L.map("map", { zoomControl: false }).setView([myLat, myLng], 14);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
@@ -331,7 +338,7 @@
         $("search-destination").onclick = async () => {
             const q = $("destination").value.trim(); if (!q) return setStatus("Escribe una dirección para buscarla.");
             $("search-destination").disabled = true; setStatus("Buscando dirección…");
-            try { const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=mx&q=${encodeURIComponent(q + ", Mazatlán, Sinaloa")}`; const res = await fetch(url, { headers: { "Accept": "application/json" } }); const data = await res.json(); if (!data.length) throw Error("not found"); await selectDestination(Number(data[0].lat), Number(data[0].lon), data[0].display_name) }
+            try { const f = (await photon(q))[0]; if (f) { await selectDestination(f.lat, f.lng, f.label); return } const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=mx&q=${encodeURIComponent(q + ", Mazatlán, Sinaloa")}`; const res = await fetch(url, { headers: { "Accept": "application/json" } }); const data = await res.json(); if (!data.length) throw Error("not found"); await selectDestination(Number(data[0].lat), Number(data[0].lon), data[0].display_name) }
             catch { setStatus("No encontramos esa dirección. Prueba con otra referencia o toca el mapa.") } finally { $("search-destination").disabled = false }
         };
         $("destination").addEventListener("keydown", e => { if (e.key === "Enter") $("search-destination").click() });
@@ -343,20 +350,20 @@
                 if (mode === "auto") { const next = availableDrivers().find(d => !tried.has(d.id)); if (next) return sendRide(next, name, phone, tried); throw Error("No hay conductores disponibles en este momento.") }
                 throw Error("El conductor ya no está disponible. Elige otro.");
             }
-            const ref = await addDoc(collection(db, "viajes"), { cliente: name, telefono: phone, destino: $("destination").value.trim(), km: Number(routeKm.toFixed(2)), tarifa_final: fare(routeKm), lat: myLat, lng: myLng, dest_lat: destLat, dest_lng: destLng, chofer_solicitado: driver.id, chofer_nombre: driver.nombre || "Conductor", modo_asignacion: mode === "auto" ? "mas_cercano" : "elegido", estado: "solicitado_chofer", fecha: serverTimestamp() });
+            const origen = await reverseLabel(myLat, myLng); const ref = await addDoc(collection(db, "viajes"), { cliente: name, telefono: phone, destino: $("destination").value.trim(), km: Number(routeKm.toFixed(2)), tarifa_final: fare(routeKm), lat: myLat, lng: myLng, origen, dest_lat: destLat, dest_lng: destLng, chofer_solicitado: driver.id, chofer_nombre: driver.nombre || "Conductor", modo_asignacion: mode === "auto" ? "mas_cercano" : "elegido", estado: "solicitado_chofer", fecha: serverTimestamp() });
             if (unsubscribeRide) unsubscribeRide();
             rideId = ref.id; selectedDriver = driver; $("normal-screen").classList.add("hidden"); $("waiting-screen").classList.remove("hidden"); $("waiting-driver").textContent = driver.nombre || "Conductor"; $("waiting-fare").textContent = "$" + fare(routeKm); $("waiting-distance").textContent = routeKm.toFixed(1) + " km"; $("waiting-status").textContent = "Notificando al conductor…";
             const lost = msg => { $("waiting-status").textContent = msg; $("cancel-ride").textContent = "VOLVER A SOLICITAR"; $("cancel-ride").onclick = () => location.reload() };
             unsubscribeRide = onSnapshot(doc(db, "viajes", rideId), snap => {
                 if (rideCancelled || !snap.exists() || snap.id !== rideId) return; const v = snap.data();
-                if (v.estado === "aceptado") { const dd = drivers.get(driver.id) || driver; $("waiting-status").textContent = "¡Viaje aceptado! El conductor va hacia tu ubicación."; $("open-driver-route").href = `https://www.google.com/maps/search/?api=1&query=${dd.lat},${dd.lng}`; $("open-driver-route").classList.remove("hidden") }
+                if (v.estado === "aceptado") { const dd = drivers.get(driver.id) || driver; $("waiting-status").textContent = v.chofer_llego ? "🚗 ¡Tu conductor llegó! Te está esperando." : "¡Viaje aceptado! El conductor va hacia tu ubicación."; if (v.chofer_llego && !arrivedNotified) { arrivedNotified = true; notifyArrival() } $("open-driver-route").href = `https://www.google.com/maps/search/?api=1&query=${dd.lat},${dd.lng}`; $("open-driver-route").classList.remove("hidden") }
                 else if (v.estado === "rechazado" || v.estado === "cancelado_chofer") {
                     const next = mode === "auto" ? availableDrivers().find(d => !tried.has(d.id)) : null;
                     if (next) { $("waiting-status").textContent = "Buscando al siguiente conductor cercano…"; sendRide(next, name, phone, tried).catch(() => lost("Ningún conductor cercano pudo tomar tu viaje. Puedes solicitarlo de nuevo.")) }
                     else lost(mode === "auto" ? "Ningún conductor cercano pudo tomar tu viaje. Puedes solicitarlo de nuevo." : "El conductor no pudo completar la solicitud. Puedes solicitar otro viaje.");
                 }
                 else if (v.estado === "cancelado_cliente") $("waiting-status").textContent = "Solicitud cancelada.";
-                else if (v.estado === "finalizado") { $("waiting-status").textContent = "Viaje finalizado. ¡Gracias por viajar con VIPDRIVE!"; $("cancel-ride").textContent = "CERRAR"; $("cancel-ride").onclick = () => location.reload() }
+                else if (v.estado === "finalizado") showRating(snap.id, driver)
             });
         }
         $("request-ride").onclick = async () => {
@@ -369,6 +376,58 @@
             catch (e) { setStatus(e.message || "No se pudo enviar la solicitud. Intenta de nuevo."); requestBusy = false; setButton() }
         };
         $("cancel-ride").onclick = async () => { if (!rideId) return; if (!confirm("¿Seguro que deseas cancelar la solicitud?")) return; rideCancelled = true; try { await updateDoc(doc(db, "viajes", rideId), { estado: "cancelado_cliente", fecha_cancel: serverTimestamp() }); $("waiting-status").textContent = "Solicitud cancelada."; if (unsubscribeRide) unsubscribeRide(); } catch { rideCancelled = false; alert("No se pudo cancelar. Comprueba tu conexión.") } };
+        // Sugerencias de destino (Photon/OpenStreetMap, gratuito), llegada del conductor y calificación
+        const phCache = new Map();
+        async function photon(q, signal) {
+            const key = q.toLowerCase(); if (phCache.has(key)) return phCache.get(key);
+            const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=${myLat}&lon=${myLng}&limit=15&location_bias_scale=0.5`, { signal }); if (!res.ok) throw Error("photon");
+            const seen = new Set(), out = [];
+            for (const f of (await res.json()).features || []) {
+                const p = f.properties || {}, [lng, lat] = f.geometry.coordinates; if (distanceKm(myLat, myLng, lat, lng) > 40) continue;
+                const street = [p.street, p.housenumber].filter(Boolean).join(" "), title = p.name || street; if (!title) continue;
+                const sub = [p.name && street ? street : "", p.suburb || p.district || p.locality, p.city || p.county].filter(Boolean).join(", "), label = sub ? `${title}, ${sub}` : title;
+                if (seen.has(label)) continue; seen.add(label); out.push({ lat, lng, title, sub, label });
+            }
+            phCache.set(key, out); return out;
+        }
+        async function reverseLabel(lat, lng) {
+            try { const c = new AbortController(), t = setTimeout(() => c.abort(), 2500); const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`, { signal: c.signal }); clearTimeout(t); const p = (await res.json()).features?.[0]?.properties || {}; return [[p.street || p.name, p.housenumber].filter(Boolean).join(" "), p.suburb || p.district || p.locality, p.city].filter(Boolean).join(", ") } catch { return "" }
+        }
+        const sug = document.createElement("ul"), host = $("destination").parentElement; let items = [], hi = -1, ctl = null, tmr = null;
+        sug.className = "hidden absolute left-0 right-0 top-full mt-1 z-[900] bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"; sug.setAttribute("role", "listbox"); host.style.position = "relative"; host.append(sug);
+        const hideSug = () => { sug.classList.add("hidden"); hi = -1 };
+        function pickSug(it) { hideSug(); selectDestination(it.lat, it.lng, it.label) }
+        function paintSug() {
+            sug.replaceChildren(...items.map((it, i) => { const li = document.createElement("li"), b = document.createElement("b"); li.setAttribute("role", "option"); li.className = "px-4 py-3 cursor-pointer text-left " + (i === hi ? "bg-violet-50" : ""); b.className = "block text-sm"; b.textContent = "📍 " + it.title; li.append(b); if (it.sub) { const s = document.createElement("span"); s.className = "block text-xs text-gray-500"; s.textContent = it.sub; li.append(s) } li.onpointerdown = e => { e.preventDefault(); pickSug(it) }; return li }));
+            sug.classList.toggle("hidden", !items.length);
+        }
+        $("destination").addEventListener("input", () => {
+            clearTimeout(tmr); const q = $("destination").value.trim(); if (q.length < 3) { items = []; return hideSug() }
+            tmr = setTimeout(async () => { ctl?.abort(); ctl = new AbortController(); try { items = (await photon(q, ctl.signal)).slice(0, 6); hi = -1; paintSug() } catch (e) { if (e.name !== "AbortError") hideSug() } }, 350);
+        });
+        $("destination").addEventListener("blur", () => setTimeout(hideSug, 150));
+        window.addEventListener("keydown", e => {
+            if (e.target !== $("destination") || sug.classList.contains("hidden")) return;
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); hi = (hi + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length; paintSug() }
+            else if (e.key === "Enter" && hi >= 0) { e.preventDefault(); e.stopImmediatePropagation(); pickSug(items[hi]) } else if (e.key === "Escape") hideSug();
+        }, true);
+        function notifyArrival() {
+            $("waiting-status").className = "text-base text-green-700 font-black mt-4"; try { navigator.vibrate?.([300, 150, 300]) } catch { }
+            try { new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg").play().catch(() => { }) } catch { }
+        }
+        function showRating(id, driver) {
+            if (ratingShown) return; ratingShown = true; let stars = 0;
+            $("waiting-status").textContent = "Viaje finalizado. ¡Gracias por viajar con VIPDRIVE!"; $("cancel-ride").classList.add("hidden"); $("open-driver-route").classList.add("hidden");
+            $("rate-title").textContent = `¿Cómo estuvo tu viaje con ${(driver.nombre || "tu conductor").split(" ")[0]}?`; $("rating-box").classList.remove("hidden");
+            const box = $("stars"), paint = () => [...box.children].forEach((b, i) => { b.style.color = i < stars ? "#f5b301" : "#d1d5db"; b.setAttribute("aria-checked", i + 1 === stars) });
+            box.replaceChildren(...[1, 2, 3, 4, 5].map(n => { const b = document.createElement("button"); b.type = "button"; b.textContent = "★"; b.className = "text-4xl leading-none px-1"; b.setAttribute("role", "radio"); b.setAttribute("aria-label", n + (n === 1 ? " estrella" : " estrellas")); b.onclick = () => { stars = n; paint(); $("rate-send").disabled = false }; return b })); paint();
+            $("rate-skip").onclick = () => location.reload();
+            $("rate-send").onclick = async () => {
+                if (!stars) return; $("rate-send").disabled = true;
+                try { await updateDoc(doc(db, "viajes", id), { calificacion: stars, comentario: $("rate-comment").value.trim().slice(0, 300), calificado: serverTimestamp() }); await updateDoc(doc(db, "choferes", driver.id), { rating_sum: increment(stars), rating_count: increment(1) }); $("rating-box").innerHTML = '<p class="font-black text-lg">¡Gracias por tu calificación! ⭐</p><button type="button" class="primary mt-3" onclick="location.reload()">CERRAR</button>' }
+                catch (e) { console.error(e); $("rate-send").disabled = false; alert("No se pudo enviar tu calificación. Intenta de nuevo.") }
+            };
+        }
         // Modo de asignación, perfil del conductor y carritos en vivo
         function setMode(m) { mode = m; $("mode-pick").classList.toggle("on", m === "pick"); $("mode-auto").classList.toggle("on", m === "auto"); $("mode-pick").setAttribute("aria-pressed", m === "pick"); $("mode-auto").setAttribute("aria-pressed", m === "auto"); $("pick-driver").classList.toggle("hidden", m === "auto"); $("auto-note").classList.toggle("hidden", m !== "auto"); if (m === "auto") { selectedDriver = null; $("selected-driver-label").textContent = "" } renderDrivers() }
         $("mode-pick").onclick = () => setMode("pick"); $("mode-auto").onclick = () => setMode("auto");
@@ -386,9 +445,9 @@
             $("pf-count").textContent = ph.length > 1 ? `Desliza para ver las ${ph.length} fotos` : "";
         }
         function openProfile(id) {
-            const d = drivers.get(id); if (!d) return; profileId = id; paintPhotos(d, photoCache.get(id) || photosOf(d));
-            if (!photoCache.has(id)) { $("pf-count").textContent = "Cargando fotos…"; getDoc(doc(db, "fotos_choferes", id)).then(s => { const f = s.exists() ? (s.data().fotos || []).filter(Boolean) : []; if (f.length) photoCache.set(id, f); if (profileId === id) paintPhotos(d, f.length ? f : photosOf(d)) }).catch(() => { if (profileId === id) paintPhotos(d, photosOf(d)) }) }
-            $("pf-name").textContent = d.nombre || "Conductor"; $("pf-car").textContent = d.auto || "Vehículo registrado"; $("pf-plate").textContent = d.placas || "—";
+            const d = drivers.get(id); if (!d) return; profileId = id; const fk = d.fotosDoc || id; paintPhotos(d, photoCache.get(fk) || photosOf(d));
+            if (!photoCache.has(fk)) { $("pf-count").textContent = "Cargando fotos…"; getDoc(doc(db, "fotos_choferes", fk)).then(s => { const f = s.exists() ? (s.data().fotos || []).filter(Boolean) : []; if (f.length) photoCache.set(fk, f); if (profileId === id) paintPhotos(d, f.length ? f : photosOf(d)) }).catch(() => { if (profileId === id) paintPhotos(d, photosOf(d)) }) }
+            $("pf-name").textContent = d.nombre || "Conductor"; $("pf-car").textContent = (d.auto || "Vehículo registrado") + (d.rating_count ? ` · ★ ${(d.rating_sum / d.rating_count).toFixed(1)} (${d.rating_count})` : ""); $("pf-plate").textContent = d.placas || "—";
             $("pf-dist").textContent = Number.isFinite(d.lat) ? distanceKm(myLat, myLng, d.lat, d.lng).toFixed(1) + " km" : "—";
             $("pf-select").classList.toggle("hidden", !!rideId); $("pf-select").textContent = selectedDriver?.id === id ? "Quitar selección" : `Enviar mi viaje a ${(d.nombre || "este conductor").split(" ")[0]}`;
             $("profile").classList.remove("hidden");
