@@ -31,15 +31,14 @@
             <button id="cancelar" type="button" class="hidden text-xs text-violet-300 underline">Cancelar edición</button>
         </div>
         <input id="nombre" autocomplete="off" placeholder="Nombre completo" aria-label="Nombre completo" class="vd-in">
-        <input id="celular" inputmode="tel" autocomplete="off" placeholder="Celular (10 dígitos). Ej: 6691234567" aria-label="Celular" class="vd-in">
-        <div class="grid grid-cols-2 gap-2">
-            <input id="auto" autocomplete="off" placeholder="Modelo. Ej: Kia Rio blanco" aria-label="Modelo de auto" class="vd-in">
-            <input id="placas" autocomplete="off" placeholder="Placas" aria-label="Placas" class="vd-in">
+        <input id="celular" inputmode="tel" autocomplete="off" placeholder="Celular (será su usuario). Ej: 6691234567" aria-label="Celular" class="vd-in">
+        <div class="flex gap-2">
+            <input id="clave" autocomplete="off" placeholder="Contraseña de acceso (mín. 6)" aria-label="Contraseña del chofer" class="vd-in">
+            <button id="gen" type="button" class="shrink-0 rounded-xl bg-white/10 px-3 text-xs font-bold">Generar</button>
         </div>
-        <div>
-            <p class="text-xs text-gray-400 mb-1">Fotos del conductor y del auto (hasta 5). La primera es la principal.</p>
-            <div id="slots" class="grid grid-cols-5 gap-2"></div>
-        </div>
+        <p id="clave-hint" class="text-[11px] text-gray-400"></p>
+        <div id="vehs" class="space-y-3"></div>
+        <button id="addveh" type="button" class="w-full py-2 rounded-xl border border-dashed border-white/20 text-sm text-violet-200">+ Agregar otro vehículo</button>
         <button id="crear" class="w-full py-3 rounded-xl font-extrabold bg-gradient-to-br from-[#8a6dff] to-[#5b3fe0] disabled:opacity-50">CREAR CHOFER</button>
         <p id="status" role="status" class="text-xs text-center text-green-400 min-h-[1rem]"></p>
     </div>
@@ -57,27 +56,41 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
         const app = initializeApp(firebaseConfig), db = getFirestore(app);
         const $ = id => document.getElementById(id);
         const esc = s => String(s ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
-        const MAX = 5, FIELDS = ["nombre", "celular", "auto", "placas"];
-        let slots = Array(MAX).fill(null), editingId = null, cache = new Map();
+        const MAX = 5; let vehs = [], editingId = null, cache = new Map();
         const say = (msg, color = "green") => { $("status").className = `text-xs text-center text-${color}-400 min-h-[1rem]`; $("status").innerHTML = msg };
-        const photosOf = c => [c.thumb || c.foto].filter(Boolean);
+        const newVeh = (o = {}) => ({ id: o.id || "v" + Date.now().toString(36) + Math.random().toString(36).slice(2, 4), auto: o.auto || "", placas: o.placas || "", fotosDoc: o.fotosDoc || null, slots: Array(MAX).fill(null) });
+        async function hashPass(pass, saltB64) {
+            const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveBits"]);
+            const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: Uint8Array.from(atob(saltB64), c => c.charCodeAt(0)), iterations: 100000, hash: "SHA-256" }, key, 256);
+            return btoa(String.fromCharCode(...new Uint8Array(bits)));
+        }
 
         $("pass").oninput = e => { if (e.target.value === "vip2026") { $("form").classList.remove("hidden"); $("registrados").classList.remove("hidden"); } };
+        $("gen").onclick = () => { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; $("clave").value = [...crypto.getRandomValues(new Uint8Array(8))].map(n => a[n % a.length]).join(""); };
 
-        function renderSlots() {
-            $("slots").innerHTML = slots.map((s, i) => `<div class="relative aspect-square"><label class="block w-full h-full rounded-xl border border-dashed border-white/20 bg-black/50 overflow-hidden cursor-pointer grid place-items-center text-[10px] text-gray-400 text-center focus-within:border-violet-400">${s ? `<img src="${esc(s.prev || s.url)}" alt="Foto ${i + 1}" class="w-full h-full object-cover">` : `<span>+<br>${i ? "Foto " + (i + 1) : "Principal"}</span>`}<input type="file" accept="image/*" data-slot="${i}" class="sr-only"></label>${s ? `<button type="button" data-rm="${i}" aria-label="Quitar foto ${i + 1}" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-[11px] leading-none">×</button>` : ""}</div>`).join("");
+        function renderVehs() {
+            $("vehs").innerHTML = vehs.map((v, i) => `<div class="rounded-xl border border-white/10 bg-black/40 p-3 space-y-2">
+<div class="flex items-center justify-between"><b class="text-sm">Vehículo ${i + 1}</b>${vehs.length > 1 ? `<button type="button" data-rmveh="${i}" class="text-xs text-red-400">Quitar</button>` : ""}</div>
+<div class="grid grid-cols-2 gap-2"><input data-vi="${i}" data-vf="auto" value="${esc(v.auto)}" placeholder="Modelo. Ej: Kia Rio blanco" aria-label="Modelo de auto" class="vd-in"><input data-vi="${i}" data-vf="placas" value="${esc(v.placas)}" placeholder="Placas" aria-label="Placas" class="vd-in"></div>
+<p class="text-[11px] text-gray-400">Fotos (hasta 5). La primera es la principal.</p>
+<div class="grid grid-cols-5 gap-2">${v.slots.map((s, k) => `<div class="relative aspect-square"><label class="block w-full h-full rounded-xl border border-dashed border-white/20 bg-black/50 overflow-hidden cursor-pointer grid place-items-center text-[10px] text-gray-400 text-center focus-within:border-violet-400">${s ? `<img src="${esc(s.prev || s.url)}" alt="Foto ${k + 1}" class="w-full h-full object-cover">` : `<span>+<br>${k ? "Foto " + (k + 1) : "Principal"}</span>`}<input type="file" accept="image/*" data-vi="${i}" data-slot="${k}" class="sr-only"></label>${s ? `<button type="button" data-vi="${i}" data-rm="${k}" aria-label="Quitar foto ${k + 1}" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-[11px] leading-none">×</button>` : ""}</div>`).join("")}</div></div>`).join("");
         }
-        $("slots").addEventListener("change", e => {
-            const i = e.target.dataset.slot, f = e.target.files?.[0]; if (i === undefined || !f) return;
+        $("vehs").addEventListener("input", e => { const { vi, vf } = e.target.dataset; if (vf) vehs[vi][vf] = e.target.value; });
+        $("vehs").addEventListener("change", e => {
+            const { vi, slot } = e.target.dataset, f = e.target.files?.[0]; if (slot === undefined || !f) return;
             if (!f.type.startsWith("image/")) return alert("Elige un archivo de imagen.");
-            slots[i] = { file: f, prev: URL.createObjectURL(f) }; renderSlots();
+            vehs[vi].slots[slot] = { file: f, prev: URL.createObjectURL(f) }; renderVehs();
         });
-        $("slots").addEventListener("click", e => { const i = e.target.dataset?.rm; if (i !== undefined) { slots[i] = null; renderSlots(); } });
+        $("vehs").addEventListener("click", e => {
+            const d = e.target.dataset; if (d.rm !== undefined) { vehs[d.vi].slots[d.rm] = null; renderVehs(); }
+            if (d.rmveh !== undefined && confirm("¿Quitar este vehículo?")) { vehs.splice(d.rmveh, 1); renderVehs(); }
+        });
+        $("addveh").onclick = () => { vehs.push(newVeh()); renderVehs(); };
 
         async function toData(file, max, q) {
             const bmp = await createImageBitmap(file), k = Math.min(1, max / Math.max(bmp.width, bmp.height)), c = document.createElement("canvas");
@@ -90,40 +103,50 @@
         }
 
         function resetForm() {
-            editingId = null; FIELDS.forEach(k => $(k).value = ""); slots = Array(MAX).fill(null); renderSlots();
+            editingId = null; ["nombre", "celular", "clave"].forEach(k => $(k).value = ""); vehs = [newVeh()]; renderVehs(); $("clave-hint").textContent = "";
             $("form-title").textContent = "Nuevo chofer"; $("crear").textContent = "CREAR CHOFER"; $("cancelar").classList.add("hidden");
         }
         async function editDriver(id) {
-            const c = cache.get(id); if (!c) return;
-            resetForm(); editingId = id; $("nombre").value = c.nombre || ""; $("celular").value = c.celular || c.id || ""; $("auto").value = c.auto || ""; $("placas").value = c.placas || "";
+            const c = cache.get(id); if (!c) return; resetForm(); editingId = id;
+            $("nombre").value = c.nombre || ""; $("celular").value = c.celular || c.id || "";
+            vehs = (c.vehiculos?.length ? c.vehiculos : [{ id: "v1", auto: c.auto, placas: c.placas, fotosDoc: c.fotosDoc || id }]).map(newVeh); renderVehs();
+            $("clave-hint").textContent = c.tiene_clave ? "Déjala vacía para conservar la contraseña actual." : "Este chofer aún no tiene contraseña: asígnale una.";
             $("form-title").textContent = "Editando a " + (c.nombre || id); $("crear").textContent = "GUARDAR CAMBIOS"; $("cancelar").classList.remove("hidden");
             $("form").scrollIntoView({ behavior: "smooth", block: "start" }); say("Cargando fotos…", "gray");
-            try { const s = await getDoc(doc(db, "fotos_choferes", id)); (s.exists() ? s.data().fotos || [] : []).slice(0, MAX).forEach((url, i) => slots[i] = { url }); say("") }
-            catch (e) { console.error(e); say("No se pudieron cargar las fotos actuales.", "red") }
-            if (editingId === id) renderSlots();
+            await Promise.all(vehs.map(async v => { try { const s = await getDoc(doc(db, "fotos_choferes", v.fotosDoc)); (s.exists() ? s.data().fotos || [] : []).slice(0, MAX).forEach((url, k) => v.slots[k] = { url }) } catch (e) { console.error(e) } }));
+            say(""); if (editingId === id) renderVehs();
         }
         $("cancelar").onclick = () => { resetForm(); say(""); };
         $("lista").addEventListener("click", e => { const b = e.target.closest("[data-edit]"); if (b) editDriver(b.dataset.edit); });
 
         $("crear").onclick = async () => {
-            const nombre = $("nombre").value.trim(), celular = $("celular").value.replace(/\D/g, ""), auto = $("auto").value.trim(), placas = $("placas").value.trim().toUpperCase();
-            const id = editingId || celular;
+            const nombre = $("nombre").value.trim(), celular = $("celular").value.replace(/\D/g, ""), clave = $("clave").value.trim(), id = editingId || celular, prev = cache.get(id);
             if (!nombre || !celular) return alert("Falta el nombre o el celular del chofer.");
             if (celular.length < 10) return alert("El celular debe tener 10 dígitos.");
-            if (!slots.some(Boolean)) return alert("Agrega al menos una foto.");
-            if (!editingId && cache.has(id) && !confirm("Ya existe un chofer con ese celular. ¿Reemplazar sus datos?")) return;
+            if (!vehs.every(v => v.auto.trim())) return alert("Falta el modelo de un vehículo.");
+            if (!vehs.every(v => v.slots.some(Boolean))) return alert("Cada vehículo necesita al menos una foto.");
+            if (!prev?.tiene_clave && !clave) return alert("Asigna una contraseña al chofer.");
+            if (clave && clave.length < 6) return alert("La contraseña debe tener al menos 6 caracteres.");
+            if (!editingId && prev && !confirm("Ya existe un chofer con ese celular. ¿Reemplazar sus datos?")) return;
             $("crear").disabled = true;
             try {
-                const build = async (max, q) => { const out = []; for (const s of slots) { if (s) out.push(s.file ? await toData(s.file, max, q) : s.url) } return out };
-                say("Procesando fotos…", "gray");
-                let fotos = await build(720, .72); if (fotos.join("").length > 850000) fotos = await build(520, .6);
-                if (fotos.join("").length > 950000) throw Error("size");
-                const thumb = await thumbOf(fotos[0]);
-                await setDoc(doc(db, "fotos_choferes", id), { fotos });
-                const data = { id, nombre, celular, auto, placas, thumb, foto: thumb, nfotos: fotos.length, aprobado: true };
+                const out = [];
+                for (const [i, v] of vehs.entries()) {
+                    say(`Procesando fotos del vehículo ${i + 1}…`, "gray");
+                    const build = async (max, q) => { const r = []; for (const s of v.slots) if (s) r.push(s.file ? await toData(s.file, max, q) : s.url); return r };
+                    let fotos = await build(720, .72); if (fotos.join("").length > 850000) fotos = await build(520, .6);
+                    if (fotos.join("").length > 950000) throw Error("size");
+                    const fotosDoc = v.fotosDoc || `${id}__${v.id}`; await setDoc(doc(db, "fotos_choferes", fotosDoc), { fotos });
+                    out.push({ id: v.id, auto: v.auto.trim(), placas: v.placas.trim().toUpperCase(), thumb: await thumbOf(fotos[0]), nfotos: fotos.length, fotosDoc });
+                }
+                const act = out.find(o => o.id === prev?.vehiculo_activo) || out[0];
+                const data = { id, nombre, celular, vehiculos: out, vehiculo_activo: act.id, auto: act.auto, placas: act.placas, thumb: act.thumb, foto: act.thumb, nfotos: act.nfotos, fotosDoc: act.fotosDoc, aprobado: true };
+                if (clave) data.tiene_clave = true;
                 if (!editingId) Object.assign(data, { disponible: true, registro_unico: true, fecha_registro: serverTimestamp() });
+                if (clave) { const salt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16)))); await setDoc(doc(db, "credenciales", id), { salt, hash: await hashPass(clave, salt), actualizado: serverTimestamp() }); }
                 await setDoc(doc(db, "choferes", id), data, { merge: true });
-                say(`✅ ${editingId ? "Cambios guardados" : "Creado"}: <a class="underline" href="chofer.html?id=${encodeURIComponent(id)}">chofer.html?id=${esc(id)}</a>`);
+                for (const old of prev?.vehiculos || []) if (!out.some(o => o.id === old.id)) deleteDoc(doc(db, "fotos_choferes", old.fotosDoc)).catch(() => { });
+                say(`✅ ${editingId ? "Cambios guardados" : "Creado"}. Usuario: <b>${esc(celular)}</b>${clave ? ` · Contraseña: <b>${esc(clave)}</b> (anótala: no se podrá volver a ver)` : ""}`);
                 resetForm();
             } catch (e) { console.error(e); say(e.message === "size" ? "Las fotos pesan demasiado. Usa menos fotos o más pequeñas." : "No se pudo guardar. Revisa tu conexión y las reglas de Firestore.", "red"); }
             finally { $("crear").disabled = false; }
@@ -134,17 +157,17 @@
             $("total").textContent = snap.size ? `(${snap.size})` : "";
             if (snap.empty) { $("lista").innerHTML = '<p class="text-xs text-gray-400 bg-zinc-900/80 rounded-xl p-3">Aún no hay conductores. Crea el primero arriba.</p>'; return; }
             $("lista").innerHTML = [...cache.values()].sort((a, b) => String(a.nombre).localeCompare(String(b.nombre))).map(c => {
-                const live = c.online === true && (c.lastUpdate?.toMillis?.() || 0) > now - 90000, ph = photosOf(c);
+                const live = c.online === true && (c.lastUpdate?.toMillis?.() || 0) > now - 90000, nv = c.vehiculos?.length || 1;
                 return `<div class="vd-row flex gap-3 items-center rounded-2xl bg-black/40 border border-white/10 p-3">
-<img src="${esc(ph[0] || "https://i.pravatar.cc/100?u=" + encodeURIComponent(c.id))}" data-id="${esc(c.id)}" alt="" loading="lazy" class="w-12 h-12 rounded-full object-cover bg-zinc-800">
-<div class="min-w-0 flex-1"><p class="font-bold text-sm truncate">${esc(c.nombre)}</p><p class="text-xs text-gray-400 truncate">${esc(c.auto)}${c.placas ? " · " + esc(c.placas) : ""}</p><p class="text-xs text-gray-500 truncate">${esc(c.celular || c.id)} · ${c.nfotos || ph.length} foto${(c.nfotos || ph.length) === 1 ? "" : "s"}</p>
-<a class="text-xs text-violet-300 underline" href="chofer.html?id=${encodeURIComponent(c.id)}">Abrir panel</a></div>
+<img src="${esc(c.thumb || c.foto || "https://i.pravatar.cc/100?u=" + encodeURIComponent(c.id))}" data-id="${esc(c.id)}" alt="" loading="lazy" class="w-12 h-12 rounded-full object-cover bg-zinc-800">
+<div class="min-w-0 flex-1"><p class="font-bold text-sm truncate">${esc(c.nombre)}</p><p class="text-xs text-gray-400 truncate">${esc(c.auto)}${c.placas ? " · " + esc(c.placas) : ""}</p><p class="text-xs text-gray-500 truncate">${esc(c.celular || c.id)} · ${nv} vehículo${nv === 1 ? "" : "s"}</p>
+<p class="text-xs ${c.tiene_clave ? "text-green-400" : "text-amber-400"}">${c.tiene_clave ? "🔑 Con contraseña" : "⚠ Sin contraseña"}</p></div>
 <div class="flex flex-col items-end gap-2"><span class="text-[10px] rounded-full px-2 py-1 ${live ? "bg-green-700 text-white" : "bg-zinc-800 text-gray-400"}">${live ? "En línea" : "Sin conexión"}</span>
 <button type="button" data-edit="${esc(c.id)}" class="text-xs font-bold rounded-lg bg-violet-600/30 text-violet-200 px-3 py-1.5">Editar</button></div></div>`;
             }).join("");
             $("lista").querySelectorAll("img").forEach(i => i.onerror = () => { i.onerror = null; i.src = "https://i.pravatar.cc/100?u=" + encodeURIComponent(i.dataset.id); });
         }, e => console.error(e));
-        renderSlots();
+        resetForm();
     </script>
 </body>
 
