@@ -103,12 +103,20 @@
         </header>
         <div id="map"></div>
         <section class="p-4 space-y-3">
+            <div id="veh-card" class="panel hidden">
+                <p class="font-black">Vehículo de hoy</p>
+                <div id="veh-list" class="mt-2 space-y-2" role="radiogroup" aria-label="Vehículo de trabajo"></div>
+                <p id="veh-note" class="text-[11px] muted mt-2"></p>
+            </div>
             <div id="id-gate" class="panel hidden">
                 <h2 class="font-black text-lg">Entra a tu cuenta</h2>
-                <p class="text-xs muted mt-1">Escribe el ID de WhatsApp con el que te registró el administrador.</p>
-                <input id="gate-id" inputmode="numeric" autocomplete="off" placeholder="Ej: 6691234567" aria-label="ID de conductor"
+                <p class="text-xs muted mt-1">Tu usuario es tu número de celular. La contraseña te la da el administrador.</p>
+                <input id="gate-id" inputmode="numeric" autocomplete="off" placeholder="Celular. Ej: 6691234567" aria-label="Celular"
                     class="mt-3 w-full rounded-xl bg-white/5 border border-white/10 p-3 text-base outline-none focus:border-violet-400">
-                <button id="gate-go" class="btn primary mt-3">ENTRAR</button>
+                <input id="gate-pass" type="password" autocomplete="current-password" placeholder="Contraseña" aria-label="Contraseña"
+                    class="mt-2 w-full rounded-xl bg-white/5 border border-white/10 p-3 text-base outline-none focus:border-violet-400">
+                <p id="gate-err" role="alert" class="text-xs text-red-400 mt-2 min-h-[1rem]"></p>
+                <button id="gate-go" class="btn primary mt-1">ENTRAR</button>
             </div>
             <div class="panel">
                 <div class="flex justify-between items-center">
@@ -129,6 +137,8 @@
                 <p id="request-client" class="font-bold mt-2"></p>
                 <p id="request-phone" class="text-xs"></p>
                 <p id="request-destination" class="text-xs mt-1"></p>
+                <p id="request-pickup" class="text-xs mt-1"></p>
+                <p id="request-eta" class="text-sm font-black mt-2"></p>
                 <div class="flex items-end justify-between mt-3"><b id="request-fare" class="text-3xl"></b><span
                         id="request-distance" class="text-xs font-bold"></span></div>
                 <div class="bg-black/20 rounded-full h-2 mt-3 overflow-hidden">
@@ -148,9 +158,12 @@
                 <p class="font-black text-green-400">✓ VIAJE EN CURSO</p>
                 <p id="active-client" class="font-bold mt-2"></p>
                 <p id="active-phone" class="text-xs muted"></p>
+                <p id="active-pickup" class="text-xs mt-3"></p>
+                <p id="active-eta" class="text-sm font-black text-green-400 mt-2"></p>
                 <p id="active-destination" class="info text-xs mt-3"></p>
                 <div class="flex justify-between mt-3 text-sm"><span class="muted">Tarifa</span><b id="active-fare"></b>
                 </div>
+                <button id="arrived" type="button" class="btn primary mt-3">📍 YA LLEGUÉ</button>
                 <a id="navigate-pickup" target="_blank" rel="noopener"
                     class="block text-center rounded-xl bg-white text-black py-3 font-black text-xs mt-3">NAVEGAR A
                     RECOGIDA</a>
@@ -167,6 +180,7 @@
             </div>
             <p class="text-center text-[10px] muted">Mantén esta página abierta mientras estés conectado. La ubicación
                 se comparte mientras el estado esté activo.</p>
+            <button id="logout" type="button" class="hidden mx-auto block text-xs text-gray-400 underline mt-2">Cerrar sesión</button>
             <nav class="vd-nav" aria-label="Secciones de VIPDRIVE"><a href="index.html">Pedir viaje</a><a href="chofer.html" aria-current="page">Soy conductor</a><a href="admin.html">Admin</a></nav>
         </section>
     </main>
@@ -177,7 +191,10 @@
         const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
         const db = getFirestore(initializeApp(firebaseConfig)), $ = id => document.getElementById(id);
         const store = { get(k) { try { return localStorage.getItem(k) || "" } catch { return "" } }, set(k, v) { try { localStorage.setItem(k, v) } catch { } } };
-        let wakeLock = null, lastWrite = 0;
+        let wakeLock = null, lastWrite = 0, lastRoute = 0;
+        function myPos() { const p = marker?.getLatLng?.(); return p ? [p.lat, p.lng] : [driverData?.lat || 23.2329, driverData?.lng || -106.4111] }
+        function showEta(r) { if (!r || ride?.chofer_llego) return; const t = `🕒 Llegas en ~${Math.max(1, Math.round(r.duration / 60))} min · ${(r.distance / 1000).toFixed(1)} km`; if (ride?.estado === "aceptado") $("active-eta").textContent = t; else $("request-eta").textContent = t + " al pasajero" }
+        function syncArrival() { const l = !!ride?.chofer_llego, b = $("arrived"); b.disabled = l; b.textContent = l ? "✓ PASAJERO AVISADO" : "📍 YA LLEGUÉ"; if (l) { if (routeLine) { map.removeLayer(routeLine); routeLine = null } $("active-eta").textContent = "Esperando al pasajero en el punto de recogida" } }
         async function keepAwake() { try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => { wakeLock = null }) } } catch (e) { console.warn(e) } }
         function letSleep() { if (wakeLock) { wakeLock.release().catch(() => { }); wakeLock = null } }
         document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && online) keepAwake() });
@@ -190,9 +207,12 @@
         function km(a, b, c, d) { const r = 6371, dl = (c - a) * Math.PI / 180, dn = (d - b) * Math.PI / 180, x = Math.sin(dl / 2) ** 2 + Math.cos(a * Math.PI / 180) * Math.cos(c * Math.PI / 180) * Math.sin(dn / 2) ** 2; return 2 * r * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)) }
         async function drawRoute(a, b, c, d) { try { const u = `https://router.project-osrm.org/route/v1/driving/${b},${a};${d},${c}?overview=full&geometries=geojson`, r = await fetch(u), j = await r.json(); if (!j.routes?.length) throw Error(); const coords = j.routes[0].geometry.coordinates.map(p => [p[1], p[0]]); if (routeLine) map.removeLayer(routeLine); routeLine = L.polyline(coords, { color: "#7657f6", weight: 6 }).addTo(map); map.fitBounds(routeLine.getBounds(), { padding: [30, 30] }); return j.routes[0] } catch { if (routeLine) map.removeLayer(routeLine); routeLine = L.polyline([[a, b], [c, d]], { color: "#facc15", weight: 4, dashArray: "8 8" }).addTo(map); return null } }
         async function loadDriver() {
-            if (!driverId) { const saved = store.get("vipdrive_driver_id"); if (saved) { location.replace("?id=" + encodeURIComponent(saved)); return } $("driver-status").textContent = "FALTA ID"; setMessage("Escribe tu ID para entrar."); $("toggle-online").disabled = true; $("id-gate").classList.remove("hidden"); return }
+            const authed = store.get("vipdrive_auth");
+            const showGate = id => { $("driver-status").textContent = "INICIA SESIÓN"; setMessage("Entra con tu celular y contraseña."); $("toggle-online").disabled = true; $("gate-id").value = id || store.get("vipdrive_driver_id"); $("id-gate").classList.remove("hidden") };
+            if (!driverId) { if (authed) { location.replace("?id=" + encodeURIComponent(authed)); return } showGate(); return }
+            if (authed !== driverId) { showGate(driverId); return }
             $("driver-id").textContent = "ID: " + driverId;
-            try { const snap = await getDoc(doc(db, "choferes", driverId)); if (!snap.exists()) { $("driver-status").textContent = "NO REGISTRADO"; setMessage("Este conductor no está registrado en VIPDRIVE."); $("toggle-online").disabled = true; return } driverData = snap.data(); store.set("vipdrive_driver_id", driverId); $("driver-name").textContent = driverData.nombre || "Conductor" }
+            try { const snap = await getDoc(doc(db, "choferes", driverId)); if (!snap.exists()) { $("driver-status").textContent = "NO REGISTRADO"; setMessage("Este conductor no está registrado en VIPDRIVE."); $("toggle-online").disabled = true; return } driverData = snap.data(); store.set("vipdrive_driver_id", driverId); $("logout").classList.remove("hidden"); renderVehicles(); $("driver-name").textContent = driverData.nombre || "Conductor" }
             catch (e) { setMessage("No se pudo cargar tu cuenta. Revisa tu conexión y Firebase."); console.error(e) }
         }
         function updatePosition(pos) {
@@ -200,7 +220,7 @@
             if (marker) marker.setLatLng([latitude, longitude]); else marker = L.marker([latitude, longitude]).addTo(map).bindPopup("Tu ubicación");
             map.setView([latitude, longitude], 16);
             if (Date.now() - lastWrite >= 10000) { lastWrite = Date.now(); setDoc(doc(db, "choferes", driverId), { lat: latitude, lng: longitude, heading: heading || 0, speed: speed || 0, disponible: !ride, online: true, lastUpdate: serverTimestamp() }, { merge: true }).catch(console.error) }
-            if (ride?.estado === "aceptado" && ride.lat != null) drawRoute(latitude, longitude, ride.lat, ride.lng);
+            if (ride?.estado === "aceptado" && ride.lat != null && !ride.chofer_llego && Date.now() - lastRoute > 15000) { lastRoute = Date.now(); drawRoute(latitude, longitude, ride.lat, ride.lng).then(showEta) }
         }
         async function setOnline() {
             if (!navigator.geolocation) { setMessage("Este dispositivo no permite GPS."); return }
@@ -210,7 +230,7 @@
                 try {
                     online = true; updatePosition(pos); watchId = navigator.geolocation.watchPosition(updatePosition, e => { setMessage("Se perdió la señal GPS. Revisa los permisos."); console.warn(e) }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
                     await setDoc(doc(db, "choferes", driverId), { online: true, disponible: true, lastUpdate: serverTimestamp() }, { merge: true });
-                    $("driver-status").textContent = "EN LÍNEA"; $("driver-status").className = "text-[10px] rounded-full bg-green-700 px-3 py-2"; $("gps-label").textContent = "GPS activo"; $("toggle-online").textContent = "DESACTIVAR DISPONIBILIDAD"; $("toggle-online").className = "btn red mt-4"; setMessage("Estás visible para recibir solicitudes."); listenRequests(); keepAwake();
+                    $("driver-status").textContent = "EN LÍNEA"; $("driver-status").className = "text-[10px] rounded-full bg-green-700 px-3 py-2"; $("gps-label").textContent = "GPS activo"; $("toggle-online").textContent = "DESACTIVAR DISPONIBILIDAD"; $("toggle-online").className = "btn red mt-4"; setMessage("Estás visible para recibir solicitudes."); listenRequests(); keepAwake(); renderVehicles();
                 } catch (e) { online = false; setMessage("No se pudo activar el GPS: " + e.message) }
                 finally { $("toggle-online").disabled = false }
             }, e => { $("toggle-online").disabled = false; setMessage(e.code === 1 ? "Permite el acceso a la ubicación para conectarte." : "No se pudo obtener tu ubicación. Intenta de nuevo.") }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 });
@@ -218,7 +238,7 @@
         async function setOffline() {
             online = false; if (watchId !== null) navigator.geolocation.clearWatch(watchId); watchId = null; if (requestUnsub) requestUnsub(); if (requestTimer) clearInterval(requestTimer);
             try { await setDoc(doc(db, "choferes", driverId), { online: false, disponible: false, lastUpdate: serverTimestamp() }, { merge: true }) } catch (e) { console.error(e) }
-            $("driver-status").textContent = "DESCONECTADO"; $("driver-status").className = "text-[10px] rounded-full bg-gray-700 px-3 py-2"; $("gps-label").textContent = "GPS apagado"; $("toggle-online").textContent = "ACTIVAR DISPONIBILIDAD Y GPS"; $("toggle-online").className = "btn primary mt-4"; show(null); letSleep(); setMessage("Estás desconectado y ya no recibirás solicitudes.");
+            $("driver-status").textContent = "DESCONECTADO"; $("driver-status").className = "text-[10px] rounded-full bg-gray-700 px-3 py-2"; $("gps-label").textContent = "GPS apagado"; $("toggle-online").textContent = "ACTIVAR DISPONIBILIDAD Y GPS"; $("toggle-online").className = "btn primary mt-4"; show(null); letSleep(); renderVehicles(); setMessage("Estás desconectado y ya no recibirás solicitudes.");
         }
         $("toggle-online").onclick = () => online ? setOffline() : setOnline();
         function listenRequests() {
@@ -233,12 +253,13 @@
             const v = ride; $("request-client").textContent = "Pasajero: " + (v.cliente || "Sin nombre"); $("request-phone").textContent = "Teléfono: " + (v.telefono || "No proporcionado"); $("request-destination").textContent = "Destino: " + (v.destino || "No especificado"); $("request-fare").textContent = "$" + (v.tarifa_final ?? "—"); $("request-distance").textContent = (Number(v.km) || 0).toFixed(1) + " km"; $("pickup-preview").href = `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}&travelmode=driving`;
             if (requestTimer) clearInterval(requestTimer); seconds = 20; $("request-bar").style.width = "100%"; $("request-countdown").textContent = "Tienes 20 segundos para responder";
             requestTimer = setInterval(() => { seconds--; $("request-bar").style.width = Math.max(0, seconds / 20 * 100) + "%"; $("request-countdown").textContent = `Tiempo para responder: ${seconds}s`; if (seconds <= 0) rejectRide(true) }, 1000);
-            drawRoute(driverData?.lat || 23.2329, driverData?.lng || -106.4111, v.lat, v.lng);
+            $("request-pickup").textContent = "Salida: " + (v.origen || "Ubicación del pasajero (ver mapa)");
+            { const [a, b] = myPos(); $("request-eta").textContent = "Calculando tiempo de llegada…"; drawRoute(a, b, v.lat, v.lng).then(r => r ? showEta(r) : $("request-eta").textContent = `A ${km(a, b, v.lat, v.lng).toFixed(1)} km del pasajero`) }
             try { const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg"); audio.play().catch(() => { }) } catch { }
         }
         function watchRide() {
             if (activeUnsub) activeUnsub(); activeUnsub = onSnapshot(doc(db, "viajes", ride.id), s => {
-                if (!s.exists()) return; const v = s.data(); ride = { ...ride, ...v };
+                if (!s.exists()) return; const v = s.data(); ride = { ...ride, ...v }; syncArrival();
                 if (v.estado === "cancelado_cliente") { if (requestTimer) clearInterval(requestTimer); show("cancelled-card"); $("cancelled-reason").textContent = "El pasajero canceló el viaje."; setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); ride = null; if (routeLine) map.removeLayer(routeLine) }
                 if (v.estado === "finalizado") { show(null); ride = null; if (routeLine) map.removeLayer(routeLine); setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); setMessage("Viaje finalizado. Ya puedes recibir otra solicitud."); if (activeUnsub) activeUnsub() }
                 if (v.estado === "cancelado_chofer" || v.estado === "rechazado") { show("cancelled-card"); $("cancelled-reason").textContent = "La solicitud ya no está activa."; ride = null }
@@ -250,10 +271,10 @@
                 const ref = doc(db, "viajes", ride.id), fresh = await getDoc(ref); if (!fresh.exists() || fresh.data().estado !== "solicitado_chofer") throw Error("Esta solicitud ya no está disponible.");
                 await updateDoc(ref, { estado: "aceptado", chofer: driverId, chofer_acepto: serverTimestamp() });
                 ride = { ...ride, estado: "aceptado" }; await setDoc(doc(db, "choferes", driverId), { disponible: false, online: true, lastUpdate: serverTimestamp() }, { merge: true });
-                show("active-card"); $("active-client").textContent = "Pasajero: " + (ride.cliente || ""); $("active-phone").textContent = "Teléfono: " + (ride.telefono || ""); $("active-destination").textContent = "Destino: " + (ride.destino || ""); $("active-fare").textContent = "$" + ride.tarifa_final;
+                show("active-card"); $("active-client").textContent = "Pasajero: " + (ride.cliente || ""); $("active-phone").textContent = "Teléfono: " + (ride.telefono || ""); $("active-destination").textContent = "Destino: " + (ride.destino || ""); $("active-fare").textContent = "$" + ride.tarifa_final; $("active-pickup").textContent = "Recoger en: " + (ride.origen || "Ubicación del pasajero"); $("active-eta").textContent = ""; syncArrival();
                 $("navigate-pickup").href = `https://www.google.com/maps/dir/?api=1&destination=${ride.lat},${ride.lng}&travelmode=driving`;
                 $("navigate-destination").href = `https://www.google.com/maps/dir/?api=1&destination=${ride.dest_lat},${ride.dest_lng}&travelmode=driving`;
-                await drawRoute(driverData?.lat || 23.2329, driverData?.lng || -106.4111, ride.lat, ride.lng);
+                lastRoute = Date.now(); showEta(await drawRoute(...myPos(), ride.lat, ride.lng));
             } catch (e) { setMessage(e.message || "No se pudo aceptar el viaje."); if (ride?.estado === "solicitado_chofer") show("request-card") }
             finally { handlingRequest = false }
         }
@@ -263,11 +284,50 @@
             catch (e) { setMessage("No se pudo rechazar la solicitud."); console.error(e) } finally { handlingRequest = false }
         }
         $("accept").onclick = acceptRide; $("reject").onclick = () => rejectRide(false);
+        $("arrived").onclick = async () => {
+            if (!ride || ride.estado !== "aceptado" || ride.chofer_llego) return; $("arrived").disabled = true;
+            try { await updateDoc(doc(db, "viajes", ride.id), { chofer_llego: true, llegada: serverTimestamp() }); navigator.vibrate?.(100) }
+            catch (e) { $("arrived").disabled = false; alert("No se pudo avisar al pasajero. Revisa tu conexión.") }
+        };
         $("finish").onclick = async () => { if (!ride || ride.estado !== "aceptado") return; if (!confirm(`¿Finalizar el viaje por $${ride.tarifa_final}?`)) return; try { await updateDoc(doc(db, "viajes", ride.id), { estado: "finalizado", fin: serverTimestamp() }) } catch (e) { alert("No se pudo finalizar el viaje.") } };
         $("cancel-active").onclick = async () => { if (!ride || !confirm("¿Seguro que deseas cancelar este viaje?")) return; try { await updateDoc(doc(db, "viajes", ride.id), { estado: "cancelado_chofer", fecha_cancel: serverTimestamp() }); await setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); ride = null; show("cancelled-card"); $("cancelled-reason").textContent = "Cancelaste el viaje."; if (routeLine) map.removeLayer(routeLine) } catch { alert("No se pudo cancelar el viaje.") } };
         $("dismiss-cancelled").onclick = () => { show(null); if (online) listenRequests() };
         window.addEventListener("beforeunload", () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId) });
-        $("gate-go").onclick = () => { const v = $("gate-id").value.trim(); if (v) location.search = "?id=" + encodeURIComponent(v) };
+        async function hashPass(pass, saltB64) {
+            const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveBits"]);
+            const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: Uint8Array.from(atob(saltB64), ch => ch.charCodeAt(0)), iterations: 100000, hash: "SHA-256" }, key, 256);
+            return btoa(String.fromCharCode(...new Uint8Array(bits)));
+        }
+        let tries = 0, lockUntil = 0;
+        $("gate-go").onclick = async () => {
+            const id = $("gate-id").value.replace(/[\s()-]/g, ""), pass = $("gate-pass").value, err = $("gate-err"); err.textContent = "";
+            if (!id || !pass) { err.textContent = "Escribe tu celular y contraseña."; return }
+            if (Date.now() < lockUntil) { err.textContent = "Demasiados intentos. Espera 30 segundos."; return }
+            $("gate-go").disabled = true;
+            try {
+                const s = await getDoc(doc(db, "credenciales", id)); if (!s.exists()) { err.textContent = "Este usuario no tiene contraseña. Pídela al administrador."; return }
+                const { salt, hash } = s.data(); if (await hashPass(pass, salt) !== hash) { if (++tries >= 5) { lockUntil = Date.now() + 30000; tries = 0 } err.textContent = "Celular o contraseña incorrectos."; return }
+                store.set("vipdrive_auth", id); store.set("vipdrive_driver_id", id); location.replace("?id=" + encodeURIComponent(id));
+            } catch (e) { console.error(e); err.textContent = "No se pudo iniciar sesión. Revisa tu conexión." } finally { $("gate-go").disabled = false }
+        };
+        $("gate-pass").addEventListener("keydown", e => { if (e.key === "Enter") $("gate-go").click() });
+        $("logout").onclick = async () => { try { if (online) await setOffline() } catch { } store.set("vipdrive_auth", ""); location.replace("chofer.html") };
+        function renderVehicles() {
+            const vs = driverData?.vehiculos || [], card = $("veh-card"); if (!vs.length) return card.classList.add("hidden");
+            const lock = online || !!ride; card.classList.remove("hidden"); $("veh-note").textContent = lock ? "Desconéctate para cambiar de vehículo." : "Elige el vehículo con el que vas a trabajar.";
+            $("veh-list").replaceChildren(...vs.map(v => {
+                const b = document.createElement("button"), on = v.id === driverData.vehiculo_activo, im = document.createElement("img"), tx = document.createElement("div"), a = document.createElement("p"), p = document.createElement("p");
+                b.type = "button"; b.disabled = lock; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", on); b.className = "w-full flex items-center gap-3 rounded-2xl p-3 text-left border " + (on ? "border-violet-400 bg-violet-500/20" : "border-white/10 bg-white/5") + (lock && !on ? " opacity-50" : "");
+                im.src = v.thumb || ""; im.alt = ""; im.className = "w-12 h-12 rounded-xl object-cover bg-white/10"; tx.className = "flex-1 min-w-0"; a.className = "font-bold text-sm truncate"; a.textContent = v.auto; p.className = "text-xs muted"; p.textContent = v.placas || "";
+                tx.append(a, p); b.append(im, tx); if (on) { const k = document.createElement("span"); k.textContent = "✓"; k.className = "text-violet-300 font-black"; b.append(k) }
+                b.onclick = () => chooseVehicle(v.id); return b;
+            }));
+        }
+        async function chooseVehicle(vid) {
+            if (online || ride || vid === driverData.vehiculo_activo) return; const v = driverData.vehiculos.find(x => x.id === vid); if (!v) return;
+            try { await updateDoc(doc(db, "choferes", driverId), { vehiculo_activo: v.id, auto: v.auto, placas: v.placas, thumb: v.thumb, foto: v.thumb, nfotos: v.nfotos, fotosDoc: v.fotosDoc }); driverData = { ...driverData, vehiculo_activo: v.id, auto: v.auto, placas: v.placas }; renderVehicles() }
+            catch (e) { console.error(e); setMessage("No se pudo cambiar de vehículo. Revisa tu conexión.") }
+        }
         $("gate-id").addEventListener("keydown", e => { if (e.key === "Enter") $("gate-go").click() });
         loadDriver();
     </script>
