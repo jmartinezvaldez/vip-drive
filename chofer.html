@@ -103,6 +103,16 @@
         </header>
         <div id="map"></div>
         <section class="p-4 space-y-3">
+            <div id="active-card" class="panel hidden border-green-500/40">
+                <div id="active-details" class="hidden">
+                    <p id="active-client"></p><p id="active-phone"></p><p id="active-pickup"></p><p id="active-eta"></p><p id="active-destination"></p><b id="active-fare"></b>
+                    <a id="navigate-pickup" target="_blank" rel="noopener">Navegar a recogida</a><a id="navigate-destination" target="_blank" rel="noopener">Navegar a destino</a>
+                </div>
+                <button id="arrived" type="button" class="btn primary">📍 YA LLEGUÉ</button>
+                <button id="finish" type="button" class="btn green hidden">FINALIZAR VIAJE</button>
+                <button id="cancel-active" type="button" class="btn red mt-2">CANCELAR VIAJE</button>
+            </div>
+            
             <div id="veh-card" class="panel hidden">
                 <p class="font-black">Vehículo de hoy</p>
                 <div id="veh-list" class="mt-2 space-y-2" role="radiogroup" aria-label="Vehículo de trabajo"></div>
@@ -154,25 +164,6 @@
                 </div>
             </div>
 
-            <div id="active-card" class="panel hidden border-green-500/40">
-                <p class="font-black text-green-400">✓ VIAJE EN CURSO</p>
-                <p id="active-client" class="font-bold mt-2"></p>
-                <p id="active-phone" class="text-xs muted"></p>
-                <p id="active-pickup" class="text-xs mt-3"></p>
-                <p id="active-eta" class="text-sm font-black text-green-400 mt-2"></p>
-                <p id="active-destination" class="info text-xs mt-3"></p>
-                <div class="flex justify-between mt-3 text-sm"><span class="muted">Tarifa</span><b id="active-fare"></b>
-                </div>
-                <button id="arrived" type="button" class="btn primary mt-3">📍 YA LLEGUÉ</button>
-                <a id="navigate-pickup" target="_blank" rel="noopener"
-                    class="block text-center rounded-xl bg-white text-black py-3 font-black text-xs mt-3">NAVEGAR A
-                    RECOGIDA</a>
-                <a id="navigate-destination" target="_blank" rel="noopener"
-                    class="block text-center rounded-xl bg-violet-600 text-white py-3 font-black text-xs mt-2">NAVEGAR A
-                    DESTINO</a>
-                <button id="finish" class="btn green mt-3">FINALIZAR VIAJE</button><button id="cancel-active"
-                    class="btn red mt-2">CANCELAR VIAJE</button>
-            </div>
             <div id="cancelled-card" class="panel hidden text-center">
                 <p class="text-xl font-black">VIAJE CANCELADO</p>
                 <p id="cancelled-reason" class="text-sm muted mt-2"></p><button id="dismiss-cancelled"
@@ -194,7 +185,14 @@
         let wakeLock = null, lastWrite = 0, lastRoute = 0;
         function myPos() { const p = marker?.getLatLng?.(); return p ? [p.lat, p.lng] : [driverData?.lat || 23.2329, driverData?.lng || -106.4111] }
         function showEta(r) { if (!r || ride?.chofer_llego) return; const t = `🕒 Llegas en ~${Math.max(1, Math.round(r.duration / 60))} min · ${(r.distance / 1000).toFixed(1)} km`; if (ride?.estado === "aceptado") $("active-eta").textContent = t; else $("request-eta").textContent = t + " al pasajero" }
-        function syncArrival() { const l = !!ride?.chofer_llego, b = $("arrived"); b.disabled = l; b.textContent = l ? "✓ PASAJERO AVISADO" : "📍 YA LLEGUÉ"; if (l) { if (routeLine) { map.removeLayer(routeLine); routeLine = null } $("active-eta").textContent = "Esperando al pasajero en el punto de recogida" } }
+        let routeMode = "";
+        function syncArrival() {
+            const l = !!ride?.chofer_llego, s = !!ride?.viaje_iniciado, b = $("arrived");
+            b.classList.toggle("hidden", s); $("finish").classList.toggle("hidden", !s); b.disabled = false; b.textContent = l ? "▶ INICIAR VIAJE" : "📍 YA LLEGUÉ";
+            if (!s) routeMode = "";
+            if (l && !s && routeLine) { map.removeLayer(routeLine); routeLine = null }
+            if (s && routeMode !== "dest" && ride.dest_lat != null) { routeMode = "dest"; lastRoute = Date.now(); drawRoute(...myPos(), ride.dest_lat, ride.dest_lng) }
+        }
         async function keepAwake() { try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => { wakeLock = null }) } } catch (e) { console.warn(e) } }
         function letSleep() { if (wakeLock) { wakeLock.release().catch(() => { }); wakeLock = null } }
         document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && online) keepAwake() });
@@ -220,7 +218,7 @@
             if (marker) marker.setLatLng([latitude, longitude]); else marker = L.marker([latitude, longitude]).addTo(map).bindPopup("Tu ubicación");
             map.setView([latitude, longitude], 16);
             if (Date.now() - lastWrite >= 10000) { lastWrite = Date.now(); setDoc(doc(db, "choferes", driverId), { lat: latitude, lng: longitude, heading: heading || 0, speed: speed || 0, disponible: !ride, online: true, lastUpdate: serverTimestamp() }, { merge: true }).catch(console.error) }
-            if (ride?.estado === "aceptado" && ride.lat != null && !ride.chofer_llego && Date.now() - lastRoute > 15000) { lastRoute = Date.now(); drawRoute(latitude, longitude, ride.lat, ride.lng).then(showEta) }
+            if (ride?.estado === "aceptado" && Date.now() - lastRoute > 15000) { if (ride.viaje_iniciado) { if (ride.dest_lat != null) { lastRoute = Date.now(); drawRoute(latitude, longitude, ride.dest_lat, ride.dest_lng) } } else if (!ride.chofer_llego && ride.lat != null) { lastRoute = Date.now(); drawRoute(latitude, longitude, ride.lat, ride.lng).then(showEta) } }
         }
         async function setOnline() {
             if (!navigator.geolocation) { setMessage("Este dispositivo no permite GPS."); return }
@@ -285,9 +283,12 @@
         }
         $("accept").onclick = acceptRide; $("reject").onclick = () => rejectRide(false);
         $("arrived").onclick = async () => {
-            if (!ride || ride.estado !== "aceptado" || ride.chofer_llego) return; $("arrived").disabled = true;
-            try { await updateDoc(doc(db, "viajes", ride.id), { chofer_llego: true, llegada: serverTimestamp() }); navigator.vibrate?.(100) }
-            catch (e) { $("arrived").disabled = false; alert("No se pudo avisar al pasajero. Revisa tu conexión.") }
+            if (!ride || ride.estado !== "aceptado" || ride.viaje_iniciado) return; $("arrived").disabled = true;
+            const arriving = !ride.chofer_llego;
+            try {
+                await updateDoc(doc(db, "viajes", ride.id), arriving ? { chofer_llego: true, llegada: serverTimestamp() } : { viaje_iniciado: true, inicio: serverTimestamp() });
+                ride = { ...ride, ...(arriving ? { chofer_llego: true } : { viaje_iniciado: true }) }; syncArrival(); navigator.vibrate?.(100);
+            } catch (e) { console.error(e); $("arrived").disabled = false; alert(arriving ? "No se pudo avisar al pasajero. Revisa tu conexión." : "No se pudo iniciar el viaje. Revisa tu conexión.") }
         };
         $("finish").onclick = async () => { if (!ride || ride.estado !== "aceptado") return; if (!confirm(`¿Finalizar el viaje por $${ride.tarifa_final}?`)) return; try { await updateDoc(doc(db, "viajes", ride.id), { estado: "finalizado", fin: serverTimestamp() }) } catch (e) { alert("No se pudo finalizar el viaje.") } };
         $("cancel-active").onclick = async () => { if (!ride || !confirm("¿Seguro que deseas cancelar este viaje?")) return; try { await updateDoc(doc(db, "viajes", ride.id), { estado: "cancelado_chofer", fecha_cancel: serverTimestamp() }); await setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); ride = null; show("cancelled-card"); $("cancelled-reason").textContent = "Cancelaste el viaje."; if (routeLine) map.removeLayer(routeLine) } catch { alert("No se pudo cancelar el viaje.") } };
