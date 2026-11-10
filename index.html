@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#10131b">
+    <meta name="theme-color" content="#0B0B0D">
     <title>VIPDRIVE | Solicita tu viaje</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -12,9 +12,9 @@
     <style>
         :root {
             color-scheme: light;
-            --ink: #10131b;
+            --ink: #0B0B0D;
             --muted: #687080;
-            --accent: #7657f6
+            --accent: #D4AF37
         }
 
         * {
@@ -41,7 +41,7 @@
             left: 12px;
             right: 12px;
             z-index: 500;
-            background: #10131beF;
+            background: #0B0B0DeF;
             color: white;
             border: 1px solid #ffffff22;
             border-radius: 18px;
@@ -75,8 +75,8 @@
         }
 
         .field:focus {
-            border-color: #927cff;
-            box-shadow: 0 0 0 3px #7657f61c
+            border-color: #E3C25B;
+            box-shadow: 0 0 0 3px #D4AF371c
         }
 
         .primary {
@@ -87,7 +87,7 @@
             font-weight: 900;
             letter-spacing: .02em;
             width: 100%;
-            box-shadow: 0 8px 18px #7657f633
+            box-shadow: 0 8px 18px #D4AF3733
         }
 
         .primary:disabled {
@@ -117,7 +117,7 @@
 
         .driver-icon {
             background: #fff;
-            border: 2px solid #7657f6;
+            border: 2px solid #D4AF37;
             border-radius: 50%;
             width: 42px;
             height: 42px;
@@ -138,7 +138,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚘</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vipdrive.css">
 </head>
 
@@ -161,17 +161,25 @@
             <div id="normal-screen">
                 <div class="flex items-center justify-between mb-4">
                     <div>
-                        <p class="text-xs font-bold text-violet-600 uppercase tracking-widest">Solicita un viaje</p>
+                        <p class="text-xs font-bold text-[#8A6A00] uppercase tracking-widest">Solicita un viaje</p>
                         <h1 class="text-2xl font-black mt-1">¿A dónde vamos?</h1>
                     </div>
-                    <span class="pill bg-violet-50 text-violet-700">MAZATLÁN</span>
+                    <span class="pill bg-[#FBF6E6] text-[#8A6A00]">MAZATLÁN</span>
+                </div>
+                <label class="text-xs font-bold text-gray-500">RECOGIDA</label>
+                <div class="flex gap-2 mt-1 mb-3">
+                    <input id="pickup" class="field" autocomplete="off" value="Mi ubicación actual" aria-label="Punto de recogida">
+                    <button id="pickup-gps" type="button" class="secondary text-[#8A6A00]" aria-label="Usar mi ubicación actual">◎</button>
                 </div>
                 <label class="text-xs font-bold text-gray-500">DESTINO</label>
                 <div class="flex gap-2 mt-1">
                     <input id="destination" class="field" placeholder="Escribe una dirección o toca el mapa">
-                    <button id="search-destination" class="secondary text-violet-700"
+                    <button id="search-destination" class="secondary text-[#8A6A00]"
                         aria-label="Buscar destino">⌕</button>
                 </div>
+                <div id="stops" class="mt-2 space-y-2"></div>
+                <button id="add-stop" type="button" class="text-xs font-bold text-[#8A6A00] mt-2">+ Agregar parada</button>
+                <p id="stop-note" class="hidden text-[11px] text-gray-500 mt-1"></p>
                 <p id="map-hint" class="text-[11px] text-gray-500 mt-2">Selecciona el destino escribiendo una dirección
                     o tocando el mapa.</p>
                 <div class="grid grid-cols-3 gap-2 mt-4">
@@ -180,7 +188,7 @@
                     </div>
                     <div class="rounded-xl bg-gray-50 p-3">
                         <p class="text-[10px] text-gray-500">TARIFA ESTIMADA</p><b id="fare"
-                            class="text-sm text-violet-700">$35</b>
+                            class="text-sm text-[#8A6A00]">$35</b>
                     </div>
                     <div class="rounded-xl bg-gray-50 p-3">
                         <p class="text-[10px] text-gray-500">CONDUCTORES</p><b id="available-count"
@@ -191,6 +199,13 @@
                     <div class="grid grid-cols-2 gap-2 mt-1"><input id="passenger-name" class="field" maxlength="60"
                             placeholder="Tu nombre"><input id="passenger-phone" class="field" inputmode="tel"
                             maxlength="20" placeholder="WhatsApp"></div>
+                </div>
+                <div class="mt-4"><label class="text-xs font-bold text-gray-500">MÉTODO DE PAGO</label>
+                    <div class="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-gray-100 mt-1" role="group" aria-label="Método de pago">
+                        <button type="button" id="pay-cash" class="vd-mode on" aria-pressed="true">💵 Efectivo</button>
+                        <button type="button" id="pay-transfer" class="vd-mode" aria-pressed="false">🏦 Transferencia</button>
+                    </div>
+                    <div id="pay-box" class="hidden mt-2 rounded-2xl bg-[#FBF6E6] p-3 text-sm"></div>
                 </div>
                 <div class="mt-4 grid grid-cols-2 gap-1 p-1 rounded-2xl bg-gray-100" role="group" aria-label="Cómo asignar tu viaje">
                     <button type="button" id="mode-pick" class="vd-mode on" aria-pressed="true">Elegir conductor</button>
@@ -214,9 +229,9 @@
 
             <div id="waiting-screen" class="hidden">
                 <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 rounded-2xl bg-violet-100 grid place-items-center text-2xl">🚘</div>
+                    <div class="w-12 h-12 rounded-2xl bg-[#F4E7B8] grid place-items-center text-2xl">🚘</div>
                     <div>
-                        <p class="text-xs uppercase tracking-widest text-violet-600 font-black">Solicitud enviada</p>
+                        <p class="text-xs uppercase tracking-widest text-[#8A6A00] font-black">Solicitud enviada</p>
                         <h2 class="text-xl font-black">Esperando al conductor</h2>
                     </div>
                 </div>
@@ -227,8 +242,9 @@
                             id="waiting-fare">$35</b></div>
                     <div class="flex justify-between mt-1 text-sm"><span>Distancia</span><b id="waiting-distance">—</b>
                     </div>
-                    <p id="waiting-status" class="text-xs text-violet-700 font-bold mt-4">Notificando al conductor…</p>
+                    <p id="waiting-status" class="text-xs text-[#8A6A00] font-bold mt-4">Notificando al conductor…</p>
                 </div>
+                <div id="wait-pay" class="hidden mt-3 rounded-2xl bg-[#FBF6E6] p-3 text-sm"></div>
                 <div id="rating-box" class="hidden mt-4 text-center">
                     <p id="rate-title" class="font-black text-lg">¿Cómo estuvo tu viaje?</p>
                     <div id="stars" class="flex justify-center gap-1 mt-2" role="radiogroup" aria-label="Calificación de 1 a 5 estrellas"></div>
@@ -260,16 +276,36 @@
         </div>
     </div>
 
+    <button id="sup-fab" type="button" class="fixed right-3 top-[72px] z-[950] w-11 h-11 rounded-full bg-white shadow-lg text-xl" aria-label="Soporte">💬<span id="sup-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500"></span></button>
+    <div id="sup" class="hidden fixed inset-0 z-[1001]" role="dialog" aria-modal="true" aria-labelledby="sup-title">
+        <div id="sup-bg" class="absolute inset-0 bg-black/50"></div>
+        <div class="vd-sheet absolute bottom-0 inset-x-0 max-w-xl mx-auto bg-white rounded-t-[28px] p-4 flex flex-col" style="height:min(82vh,660px);padding-bottom:max(16px,env(safe-area-inset-bottom))">
+            <div class="flex justify-between items-center"><h2 id="sup-title" class="text-lg font-extrabold">Soporte VIPDRIVE</h2><button id="sup-close" type="button" class="text-gray-500 px-2" aria-label="Cerrar">✕</button></div>
+            <div id="sup-new" class="overflow-y-auto">
+                <p class="text-xs text-gray-500 mt-1">Cuéntanos tu queja, objeto perdido u otro problema. Te respondemos aquí mismo.</p>
+                <select id="sup-type" class="field mt-3" aria-label="Tipo de reporte"><option>Objeto perdido</option><option>Queja del servicio</option><option>Problema con el cobro o pago</option><option>Otro</option></select>
+                <div class="grid grid-cols-2 gap-2 mt-2"><input id="sup-name" class="field" maxlength="60" placeholder="Tu nombre"><input id="sup-phone" class="field" inputmode="tel" placeholder="Tu WhatsApp"></div>
+                <textarea id="sup-text" rows="4" maxlength="800" class="field mt-2 w-full" placeholder="Describe lo que pasó"></textarea>
+                <button id="sup-create" type="button" class="primary mt-3">ENVIAR REPORTE</button>
+            </div>
+            <div id="sup-chat" class="hidden flex-1 min-h-0 flex flex-col">
+                <div id="sup-msgs" class="flex-1 overflow-y-auto space-y-2 py-3"></div>
+                <p id="sup-closed" class="hidden text-xs text-center text-gray-500 pb-2">Conversación cerrada. <button id="sup-restart" type="button" class="underline text-[#8A6A00]">Iniciar una nueva</button></p>
+                <div id="sup-row" class="flex gap-2"><input id="sup-input" class="field" maxlength="500" placeholder="Escribe tu mensaje"><button id="sup-send" type="button" class="primary" style="width:auto;padding:0 18px">Enviar</button></div>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, serverTimestamp, updateDoc, getDoc, increment } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, serverTimestamp, updateDoc, getDoc, increment, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
         const app = initializeApp(firebaseConfig), db = getFirestore(app);
         const $ = id => document.getElementById(id);
         const store = { get(k) { try { return localStorage.getItem(k) || "" } catch { return "" } }, set(k, v) { try { localStorage.setItem(k, v) } catch { } } };
         const DEFAULT = { lat: 23.2329, lng: -106.4111 };
-        let myLat = DEFAULT.lat, myLng = DEFAULT.lng, destLat = null, destLng = null, routeKm = 0, map, routeLine = null, pickupMarker = null, destinationMarker = null;
+        let pickupCustom = false, stops = [], payMethod = "efectivo", myLat = DEFAULT.lat, myLng = DEFAULT.lng, destLat = null, destLng = null, routeKm = 0, map, routeLine = null, pickupMarker = null, destinationMarker = null;
         let mode = "pick", rideCancelled = false, arrivedNotified = false, ratingShown = false, drivers = new Map(), selectedDriver = null, rideId = null, unsubscribeRide = null, unsubscribeDrivers = null, requestBusy = false, lastRouteAt = 0;
 
         map = L.map("map", { zoomControl: false }).setView([myLat, myLng], 14);
@@ -278,37 +314,40 @@
         function distanceKm(a, b, c, d) { const r = 6371, dl = (c - a) * Math.PI / 180, dn = (d - b) * Math.PI / 180, x = Math.sin(dl / 2) ** 2 + Math.cos(a * Math.PI / 180) * Math.cos(c * Math.PI / 180) * Math.sin(dn / 2) ** 2; return 2 * r * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)) }
         function fare(km) { return Math.max(35, Math.round(km * 10)) }
         function setStatus(message) { $("status").textContent = message }
-        function availableDrivers() { return [...drivers.values()].filter(d => d.online === true && d.disponible !== false && Number.isFinite(d.lat) && Number.isFinite(d.lng) && d.fresh).sort((a, b) => distanceKm(myLat, myLng, a.lat, a.lng) - distanceKm(myLat, myLng, b.lat, b.lng)) }
-        function setButton() { const auto = mode === "auto", has = auto ? availableDrivers().length > 0 : !!selectedDriver, valid = destLat !== null && has && !requestBusy; $("request-ride").disabled = !valid; $("request-ride").textContent = requestBusy ? "ENVIANDO…" : !destLat ? "SELECCIONA UN DESTINO" : !has ? (auto ? "SIN CONDUCTORES DISPONIBLES" : "ELIGE UN CONDUCTOR") : `SOLICITAR VIAJE${auto ? " AL MÁS CERCANO" : ""} · $${fare(routeKm)}` }
+        // Un conductor cerca de terminar su viaje (por_liberar) puede recibir solicitudes de quien esté a ≤ 2 km de su destino
+        const dKm = d => d.por_liberar && d.disponible === false && Number.isFinite(d.libre_lat) ? distanceKm(myLat, myLng, d.libre_lat, d.libre_lng) : distanceKm(myLat, myLng, d.lat, d.lng);
+        const isFree = d => d.online === true && d.fresh && Number.isFinite(d.lat) && Number.isFinite(d.lng) && (d.disponible !== false || (d.por_liberar === true && Number.isFinite(d.libre_lat) && distanceKm(myLat, myLng, d.libre_lat, d.libre_lng) <= 2));
+        function availableDrivers() { return [...drivers.values()].filter(d => isFree(d) && (payMethod !== "transferencia" || d.tiene_cuenta)).sort((a, b) => dKm(a) - dKm(b)) }
+        function setButton() { refreshPayBox(); const auto = mode === "auto", has = auto ? availableDrivers().length > 0 : !!selectedDriver, valid = destLat !== null && has && !requestBusy && !(payMethod === "transferencia" && !auto && selectedDriver && !selectedDriver.tiene_cuenta); $("request-ride").disabled = !valid; $("request-ride").textContent = requestBusy ? "ENVIANDO…" : !destLat ? "SELECCIONA UN DESTINO" : !has ? (auto ? "SIN CONDUCTORES DISPONIBLES" : "ELIGE UN CONDUCTOR") : `SOLICITAR VIAJE${auto ? " AL MÁS CERCANO" : ""} · $${fareTotal()}` }
         function clearRoute() { if (routeLine) { map.removeLayer(routeLine); routeLine = null } }
         async function routeBetween(aLat, aLng, bLat, bLng) {
-            const url = `https://router.project-osrm.org/route/v1/driving/${aLng},${aLat};${bLng},${bLat}?overview=full&geometries=geojson`;
+            const url = `https://router.project-osrm.org/route/v1/driving/${aLng},${aLat};${stopPts().map(s => s.lng + "," + s.lat + ";").join("")}${bLng},${bLat}?overview=full&geometries=geojson`;
             const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 9000);
             try { const res = await fetch(url, { signal: controller.signal }); if (!res.ok) throw Error("route"); const data = await res.json(); if (!data.routes?.length) throw Error("no route"); return { km: data.routes[0].distance / 1000, coords: data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]) } }
             finally { clearTimeout(timeout) }
         }
         async function selectDestination(lat, lng, label) {
             destLat = lat; destLng = lng; $("destination").value = label || `Destino ${lat.toFixed(5)}, ${lng.toFixed(5)}`; setStatus("Calculando ruta por calles…");
-            try { const r = await routeBetween(myLat, myLng, destLat, destLng); routeKm = r.km; clearRoute(); routeLine = L.polyline(r.coords, { color: "#7657f6", weight: 6, opacity: .9 }).addTo(map); map.fitBounds(routeLine.getBounds(), { padding: [35, 35] }); $("map-hint").textContent = "Ruta calculada por calles." }
-            catch { routeKm = distanceKm(myLat, myLng, destLat, destLng) * 1.3; clearRoute(); routeLine = L.polyline([[myLat, myLng], [destLat, destLng]], { color: "#7657f6", weight: 5, dashArray: "8 8" }).addTo(map); $("map-hint").textContent = "No se pudo consultar la ruta. Distancia aproximada en línea de referencia." }
-            if (destinationMarker) map.removeLayer(destinationMarker); destinationMarker = L.marker([lat, lng]).addTo(map).bindPopup("Destino"); $("distance").textContent = routeKm.toFixed(1) + " km"; $("fare").textContent = "$" + fare(routeKm); setButton(); setStatus("Selecciona un conductor disponible para continuar.");
+            try { const r = await routeBetween(myLat, myLng, destLat, destLng); routeKm = r.km; clearRoute(); routeLine = L.polyline(r.coords, { color: "#B8860B", weight: 6, opacity: .9 }).addTo(map); map.fitBounds(routeLine.getBounds(), { padding: [35, 35] }); $("map-hint").textContent = "Ruta calculada por calles." }
+            catch { routeKm = distanceKm(myLat, myLng, destLat, destLng) * 1.3; clearRoute(); routeLine = L.polyline([[myLat, myLng], [destLat, destLng]], { color: "#B8860B", weight: 5, dashArray: "8 8" }).addTo(map); $("map-hint").textContent = "No se pudo consultar la ruta. Distancia aproximada en línea de referencia." }
+            if (destinationMarker) map.removeLayer(destinationMarker); destinationMarker = L.marker([lat, lng]).addTo(map).bindPopup("Destino"); $("distance").textContent = routeKm.toFixed(1) + " km"; $("fare").textContent = "$" + fareTotal(); drawStops(); stopNote(); setButton(); setStatus("Selecciona un conductor disponible para continuar.");
         }
         map.on("click", e => { if (!rideId) selectDestination(e.latlng.lat, e.latlng.lng, $("destination").value.trim() || "Destino seleccionado en el mapa") });
         function renderDrivers() {
-            const list = $("driver-list"); list.innerHTML = ""; let available = [...drivers.values()].filter(d => d.online === true && d.disponible !== false && Number.isFinite(d.lat) && Number.isFinite(d.lng) && d.fresh);
+            const list = $("driver-list"); list.innerHTML = ""; let available = [...drivers.values()].filter(isFree);
             $("driver-count").textContent = available.length + " disponibles"; $("available-count").textContent = available.length;
             if (selectedDriver && !available.some(d => d.id === selectedDriver.id)) { selectedDriver = null; $("selected-driver-label").textContent = "" }
             if (!available.length) { list.innerHTML = '<p class="text-xs text-gray-500 bg-gray-50 rounded-xl p-3">No hay conductores disponibles en este momento.</p>' }
-            available.sort((a, b) => distanceKm(myLat, myLng, a.lat, a.lng) - distanceKm(myLat, myLng, b.lat, b.lng));
+            available.sort((a, b) => dKm(a) - dKm(b));
             for (const d of available) {
-                const km = distanceKm(myLat, myLng, d.lat, d.lng), chosen = selectedDriver?.id === d.id;
-                const button = document.createElement("button"); button.type = "button"; button.className = `w-full text-left flex items-center gap-3 p-3 rounded-xl border ${chosen ? "border-green-500 bg-green-50" : "border-gray-100 bg-gray-50"}`;
-                const avatar = document.createElement("div"); avatar.className = "w-11 h-11 rounded-full bg-violet-100 grid place-items-center text-xl"; avatar.textContent = "🚗"; { const p = photosOf(d)[0]; if (p) { const im = new Image(); im.src = p; im.alt = ""; im.className = "w-full h-full rounded-full object-cover"; avatar.replaceChildren(im) } }
+                const km = dKm(d), chosen = selectedDriver?.id === d.id;
+                const button = document.createElement("button"); button.type = "button"; button.className = `w-full text-left flex items-center gap-3 p-3 rounded-xl border ${chosen ? "border-[#D4AF37] bg-[#FBF6E6]" : "border-gray-100 bg-gray-50"}`;
+                const avatar = document.createElement("div"); avatar.className = "w-11 h-11 rounded-full bg-[#F4E7B8] grid place-items-center text-xl"; avatar.textContent = "🚗"; { const p = photosOf(d)[0]; if (p) { const im = new Image(); im.src = p; im.alt = ""; im.className = "w-full h-full rounded-full object-cover"; avatar.replaceChildren(im) } }
                 const details = document.createElement("div"); details.className = "flex-1 min-w-0";
                 const name = document.createElement("div"); name.className = "font-black text-sm"; name.textContent = d.nombre || "Conductor";
                 const car = document.createElement("div"); car.className = "text-xs text-gray-500"; car.textContent = [d.auto, d.anio, d.placas].filter(Boolean).join(" · ") || "Vehículo registrado";
-                const dist = document.createElement("div"); dist.className = "text-[11px] text-violet-700 font-bold"; dist.textContent = `A ${km.toFixed(1)} km`;
-                const prof = document.createElement("span"); prof.className = "text-gray-500 underline"; prof.textContent = " · Ver perfil"; prof.onclick = ev => { ev.stopPropagation(); openProfile(d.id) }; dist.append(prof); details.append(name, car, dist); const tag = document.createElement("span"); tag.className = "pill " + (chosen ? "bg-green-600 text-white" : "bg-white text-gray-600"); tag.textContent = chosen ? "ELEGIDO" : "ELEGIR"; button.append(avatar, details, tag);
+                const dist = document.createElement("div"); dist.className = "text-[11px] text-[#8A6A00] font-bold"; dist.textContent = `A ${km.toFixed(1)} km${d.por_liberar && d.disponible === false ? " · termina un viaje cerca de ti" : ""}`;
+                const prof = document.createElement("span"); prof.className = "text-gray-500 underline"; prof.textContent = " · Ver perfil"; prof.onclick = ev => { ev.stopPropagation(); openProfile(d.id) }; dist.append(prof); details.append(name, car, dist); const tag = document.createElement("span"); tag.className = "pill " + (chosen ? "bg-[#0B0B0D] text-[#D4AF37]" : "bg-white text-gray-600"); tag.textContent = chosen ? "ELEGIDO" : "ELEGIR"; button.append(avatar, details, tag);
                 button.onclick = () => { selectedDriver = d; $("selected-driver-label").textContent = "✓ " + (d.nombre || "Conductor"); renderDrivers(); setButton(); }; list.append(button);
             }
             setButton();
@@ -333,7 +372,7 @@
         }, 15000);
 
         function getLocation() { return new Promise((resolve, reject) => { if (!navigator.geolocation) return reject(Error("GPS no disponible")); navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 }) }) }
-        async function updateLocation() { try { const p = await getLocation(); myLat = p.coords.latitude; myLng = p.coords.longitude; pickupMarker.setLatLng([myLat, myLng]); map.setView([myLat, myLng], 16); setStatus("Ubicación actualizada."); if (destLat !== null) await selectDestination(destLat, destLng, $("destination").value) } catch { setStatus("No se pudo obtener tu ubicación. Revisa el permiso de GPS.") } }
+        async function updateLocation() { try { const p = await getLocation(); myLat = p.coords.latitude; myLng = p.coords.longitude; pickupMarker.setLatLng([myLat, myLng]); map.setView([myLat, myLng], 16); pickupCustom = false; $("pickup").value = "Mi ubicación actual"; setStatus("Ubicación actualizada."); if (destLat !== null) await selectDestination(destLat, destLng, $("destination").value) } catch { setStatus("No se pudo obtener tu ubicación. Revisa el permiso de GPS.") } }
         $("btn-my-location").onclick = updateLocation;
         $("search-destination").onclick = async () => {
             const q = $("destination").value.trim(); if (!q) return setStatus("Escribe una dirección para buscarla.");
@@ -346,17 +385,17 @@
         async function sendRide(driver, name, phone, tried) {
             tried.add(driver.id);
             const driverDoc = await getDoc(doc(db, "choferes", driver.id)), fd = driverDoc.data(), last = fd?.lastUpdate?.toMillis?.() || 0;
-            if (!driverDoc.exists() || fd.online !== true || fd.disponible === false || Date.now() - last > 90000) {
+            if (!driverDoc.exists() || fd.online !== true || (fd.disponible === false && !fd.por_liberar) || Date.now() - last > 90000) {
                 if (mode === "auto") { const next = availableDrivers().find(d => !tried.has(d.id)); if (next) return sendRide(next, name, phone, tried); throw Error("No hay conductores disponibles en este momento.") }
                 throw Error("El conductor ya no está disponible. Elige otro.");
             }
-            const origen = await reverseLabel(myLat, myLng); const ref = await addDoc(collection(db, "viajes"), { cliente: name, telefono: phone, destino: $("destination").value.trim(), km: Number(routeKm.toFixed(2)), tarifa_final: fare(routeKm), lat: myLat, lng: myLng, origen, dest_lat: destLat, dest_lng: destLng, chofer_solicitado: driver.id, chofer_nombre: driver.nombre || "Conductor", modo_asignacion: mode === "auto" ? "mas_cercano" : "elegido", estado: "solicitado_chofer", fecha: serverTimestamp() });
+            const origen = pickupCustom ? $("pickup").value.trim() : await reverseLabel(myLat, myLng); const ref = await addDoc(collection(db, "viajes"), { cliente: name, telefono: phone, destino: $("destination").value.trim(), km: Number(routeKm.toFixed(2)), tarifa_final: fareTotal(), lat: myLat, lng: myLng, origen, paradas: stopPts().map(({ lat, lng, label }) => ({ lat, lng, label: label || "" })), tarifa_paradas: stopFee(), metodo_pago: payMethod, dest_lat: destLat, dest_lng: destLng, chofer_solicitado: driver.id, chofer_nombre: driver.nombre || "Conductor", modo_asignacion: mode === "auto" ? "mas_cercano" : "elegido", estado: "solicitado_chofer", fecha: serverTimestamp() });
             if (unsubscribeRide) unsubscribeRide();
-            rideId = ref.id; selectedDriver = driver; $("normal-screen").classList.add("hidden"); $("waiting-screen").classList.remove("hidden"); $("waiting-driver").textContent = driver.nombre || "Conductor"; $("waiting-fare").textContent = "$" + fare(routeKm); $("waiting-distance").textContent = routeKm.toFixed(1) + " km"; $("waiting-status").textContent = "Notificando al conductor…";
+            rideId = ref.id; store.set("vipdrive_last_ride", rideId); selectedDriver = driver; $("normal-screen").classList.add("hidden"); $("waiting-screen").classList.remove("hidden"); $("waiting-driver").textContent = driver.nombre || "Conductor"; $("waiting-fare").textContent = "$" + fareTotal(); $("waiting-distance").textContent = routeKm.toFixed(1) + " km"; $("waiting-status").textContent = "Notificando al conductor…";
             const lost = msg => { $("waiting-status").textContent = msg; $("cancel-ride").textContent = "VOLVER A SOLICITAR"; $("cancel-ride").onclick = () => location.reload() };
             unsubscribeRide = onSnapshot(doc(db, "viajes", rideId), snap => {
                 if (rideCancelled || !snap.exists() || snap.id !== rideId) return; const v = snap.data();
-                if (v.estado === "aceptado") { const dd = drivers.get(driver.id) || driver; $("waiting-status").textContent = v.viaje_iniciado ? "🛣️ Viaje en curso hacia tu destino." : v.chofer_llego ? "🚗 ¡Tu conductor llegó! Te está esperando." : "¡Viaje aceptado! El conductor va hacia tu ubicación."; if (v.chofer_llego && !arrivedNotified) { arrivedNotified = true; notifyArrival() } $("open-driver-route").href = `https://www.google.com/maps/search/?api=1&query=${dd.lat},${dd.lng}`; $("open-driver-route").classList.remove("hidden") }
+                if (v.estado === "aceptado") { const dd = drivers.get(driver.id) || driver; $("waiting-status").textContent = v.en_cola ? "⏳ Tu conductor está terminando un viaje cerca de ti y irá por ti en unos minutos." : v.viaje_iniciado ? (v.paradas?.length && (v.parada_actual || 0) < v.paradas.length ? `🛣️ Viaje en curso · próxima parada ${(v.parada_actual || 0) + 1} de ${v.paradas.length}.` : "🛣️ Viaje en curso hacia tu destino.") : v.chofer_llego ? "🚗 ¡Tu conductor llegó! Te está esperando." : "¡Viaje aceptado! El conductor va hacia tu ubicación."; if (v.chofer_llego && !arrivedNotified) { arrivedNotified = true; notifyArrival() } showWaitPay(driver); $("open-driver-route").href = `https://www.google.com/maps/search/?api=1&query=${dd.lat},${dd.lng}`; $("open-driver-route").classList.remove("hidden") }
                 else if (v.estado === "rechazado" || v.estado === "cancelado_chofer") {
                     const next = mode === "auto" ? availableDrivers().find(d => !tried.has(d.id)) : null;
                     if (next) { $("waiting-status").textContent = "Buscando al siguiente conductor cercano…"; sendRide(next, name, phone, tried).catch(() => lost("Ningún conductor cercano pudo tomar tu viaje. Puedes solicitarlo de nuevo.")) }
@@ -393,24 +432,25 @@
         async function reverseLabel(lat, lng) {
             try { const c = new AbortController(), t = setTimeout(() => c.abort(), 2500); const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`, { signal: c.signal }); clearTimeout(t); const p = (await res.json()).features?.[0]?.properties || {}; return [[p.street || p.name, p.housenumber].filter(Boolean).join(" "), p.suburb || p.district || p.locality, p.city].filter(Boolean).join(", ") } catch { return "" }
         }
-        const sug = document.createElement("ul"), host = $("destination").parentElement; let items = [], hi = -1, ctl = null, tmr = null;
-        sug.className = "hidden absolute left-0 right-0 top-full mt-1 z-[900] bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"; sug.setAttribute("role", "listbox"); host.style.position = "relative"; host.append(sug);
-        const hideSug = () => { sug.classList.add("hidden"); hi = -1 };
-        function pickSug(it) { hideSug(); selectDestination(it.lat, it.lng, it.label) }
-        function paintSug() {
-            sug.replaceChildren(...items.map((it, i) => { const li = document.createElement("li"), b = document.createElement("b"); li.setAttribute("role", "option"); li.className = "px-4 py-3 cursor-pointer text-left " + (i === hi ? "bg-violet-50" : ""); b.className = "block text-sm"; b.textContent = "📍 " + it.title; li.append(b); if (it.sub) { const s = document.createElement("span"); s.className = "block text-xs text-gray-500"; s.textContent = it.sub; li.append(s) } li.onpointerdown = e => { e.preventDefault(); pickSug(it) }; return li }));
-            sug.classList.toggle("hidden", !items.length);
+        function attachSuggest(input, onPick) {
+            const sug = document.createElement("ul"), host = input.parentElement; let items = [], hi = -1, ctl = null, tmr = null;
+            sug.className = "hidden absolute left-0 right-0 top-full mt-1 z-[900] bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"; sug.setAttribute("role", "listbox"); host.style.position = "relative"; host.append(sug);
+            const hide = () => { sug.classList.add("hidden"); hi = -1 }, pick = it => { hide(); onPick(it) };
+            function paint() {
+                sug.replaceChildren(...items.map((it, i) => { const li = document.createElement("li"), b = document.createElement("b"); li.setAttribute("role", "option"); li.className = "px-4 py-3 cursor-pointer text-left " + (i === hi ? "bg-[#FBF6E6]" : ""); b.className = "block text-sm"; b.textContent = "📍 " + it.title; li.append(b); if (it.sub) { const s = document.createElement("span"); s.className = "block text-xs text-gray-500"; s.textContent = it.sub; li.append(s) } li.onpointerdown = e => { e.preventDefault(); pick(it) }; return li }));
+                sug.classList.toggle("hidden", !items.length);
+            }
+            input.addEventListener("input", () => {
+                clearTimeout(tmr); const q = input.value.trim(); if (q.length < 3) { items = []; return hide() }
+                tmr = setTimeout(async () => { ctl?.abort(); ctl = new AbortController(); try { items = (await photon(q, ctl.signal)).slice(0, 6); hi = -1; paint() } catch (e) { if (e.name !== "AbortError") hide() } }, 350);
+            });
+            input.addEventListener("blur", () => setTimeout(hide, 150));
+            window.addEventListener("keydown", e => {
+                if (e.target !== input || sug.classList.contains("hidden")) return;
+                if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); hi = (hi + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length; paint() }
+                else if (e.key === "Enter" && hi >= 0) { e.preventDefault(); e.stopImmediatePropagation(); pick(items[hi]) } else if (e.key === "Escape") hide();
+            }, true);
         }
-        $("destination").addEventListener("input", () => {
-            clearTimeout(tmr); const q = $("destination").value.trim(); if (q.length < 3) { items = []; return hideSug() }
-            tmr = setTimeout(async () => { ctl?.abort(); ctl = new AbortController(); try { items = (await photon(q, ctl.signal)).slice(0, 6); hi = -1; paintSug() } catch (e) { if (e.name !== "AbortError") hideSug() } }, 350);
-        });
-        $("destination").addEventListener("blur", () => setTimeout(hideSug, 150));
-        window.addEventListener("keydown", e => {
-            if (e.target !== $("destination") || sug.classList.contains("hidden")) return;
-            if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); hi = (hi + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length; paintSug() }
-            else if (e.key === "Enter" && hi >= 0) { e.preventDefault(); e.stopImmediatePropagation(); pickSug(items[hi]) } else if (e.key === "Escape") hideSug();
-        }, true);
         function notifyArrival() {
             $("waiting-status").className = "text-base text-green-700 font-black mt-4"; try { navigator.vibrate?.([300, 150, 300]) } catch { }
             try { new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg").play().catch(() => { }) } catch { }
@@ -428,6 +468,91 @@
                 catch (e) { console.error(e); $("rate-send").disabled = false; alert("No se pudo enviar tu calificación. Intenta de nuevo.") }
             };
         }
+        // Recogida modificable, paradas, pago por transferencia y soporte
+        attachSuggest($("destination"), it => selectDestination(it.lat, it.lng, it.label));
+        attachSuggest($("pickup"), it => selectPickup(it.lat, it.lng, it.label));
+        function selectPickup(lat, lng, label) { myLat = lat; myLng = lng; pickupCustom = true; $("pickup").value = label; pickupMarker.setLatLng([lat, lng]); map.setView([lat, lng], 15); setStatus("Punto de recogida actualizado."); recalc() }
+        $("pickup").addEventListener("focus", e => e.target.select());
+        $("pickup").addEventListener("keydown", async e => { const q = $("pickup").value.trim(); if (e.key === "Enter" && q.length > 2 && q !== "Mi ubicación actual") { const f = (await photon(q).catch(() => []))[0]; if (f) selectPickup(f.lat, f.lng, f.label) } });
+        $("pickup-gps").onclick = updateLocation;
+        pickupMarker.dragging?.enable(); pickupMarker.on("dragend", e => { const p = e.target.getLatLng(); selectPickup(p.lat, p.lng, "Punto elegido en el mapa") });
+        const stopMarkers = [];
+        function stopPts() { return stops.filter(s => Number.isFinite(s.lat)) }
+        function stopFee() { return routeKm > 0 && routeKm <= 3.5 ? 10 * stopPts().length : 0 }
+        function fareTotal() { return fare(routeKm) + stopFee() }
+        function drawStops() { stopMarkers.splice(0).forEach(m => map.removeLayer(m)); stopPts().forEach((s, i) => stopMarkers.push(L.marker([s.lat, s.lng]).addTo(map).bindPopup("Parada " + (i + 1)))) }
+        function stopNote() { const n = stopPts().length, el = $("stop-note"); el.classList.toggle("hidden", !n); el.textContent = !n ? "" : stopFee() ? `Paradas: +$${stopFee()} ($10 por parada en viajes de hasta 3.5 km).` : "En viajes de más de 3.5 km las paradas no tienen cargo extra; solo se suma la distancia recorrida." }
+        function recalc() { if (destLat !== null) selectDestination(destLat, destLng, $("destination").value); else { drawStops(); stopNote(); renderDrivers() } }
+        function addStopRow() {
+            if (stops.length >= 3) return; const s = { lat: null, lng: null }, row = document.createElement("div"), inp = document.createElement("input"), x = document.createElement("button"); stops.push(s);
+            row.className = "flex gap-2"; inp.className = "field"; inp.autocomplete = "off"; inp.placeholder = "Dirección de la parada"; inp.setAttribute("aria-label", "Parada " + stops.length); x.type = "button"; x.className = "secondary text-red-600"; x.textContent = "✕"; x.setAttribute("aria-label", "Quitar parada");
+            row.append(inp, x); $("stops").append(row);
+            attachSuggest(inp, it => { s.lat = it.lat; s.lng = it.lng; s.label = it.label; inp.value = it.label; recalc() });
+            inp.addEventListener("input", () => { if (s.lat !== null) { s.lat = null; recalc() } });
+            x.onclick = () => { stops.splice(stops.indexOf(s), 1); row.remove(); $("add-stop").classList.remove("hidden"); recalc() };
+            $("add-stop").classList.toggle("hidden", stops.length >= 3); inp.focus();
+        }
+        $("add-stop").onclick = addStopRow;
+        const acctCache = new Map();
+        async function accountFor(id) { if (acctCache.has(id)) return acctCache.get(id); const s = await getDoc(doc(db, "cuentas", id)), v = s.exists() ? s.data().cuenta || "" : ""; acctCache.set(id, v); return v }
+        function acctBox(el, name, cuenta, amount) {
+            const a = document.createElement("p"), b = document.createElement("p"), c = document.createElement("button");
+            a.className = "text-xs text-gray-600"; a.textContent = `Transfiere${amount ? " $" + amount : ""} a nombre de ${name || "tu conductor"}:`; b.className = "text-xl font-black tracking-wider mt-1"; b.textContent = String(cuenta).replace(/(\d{4})(?=\d)/g, "$1 ");
+            c.type = "button"; c.className = "secondary mt-2 w-full"; c.textContent = "Copiar cuenta"; c.onclick = () => navigator.clipboard?.writeText(cuenta).then(() => { c.textContent = "✓ Copiada" }).catch(() => { });
+            el.replaceChildren(a, b, c); el.classList.remove("hidden");
+        }
+        function refreshPayBox() {
+            const box = $("pay-box"), say = msg => { box.textContent = msg; box.classList.remove("hidden") }; if (payMethod !== "transferencia") return box.classList.add("hidden");
+            if (mode === "auto") return say("Cuando un conductor acepte tu viaje verás aquí su cuenta para transferir.");
+            const d = selectedDriver; if (!d) return say("Elige un conductor para ver su cuenta."); if (!d.tiene_cuenta) return say("Este conductor aún no tiene cuenta registrada. Elige otro o paga en efectivo.");
+            if (!acctCache.has(d.id)) say("Cargando cuenta…");
+            accountFor(d.id).then(c => { if (selectedDriver?.id === d.id && payMethod === "transferencia") c ? acctBox(box, d.nombre, c, destLat !== null ? fareTotal() : 0) : say("No se pudo cargar la cuenta del conductor.") }).catch(() => say("No se pudo cargar la cuenta."));
+        }
+        function setPay(m) { payMethod = m; $("pay-cash").classList.toggle("on", m === "efectivo"); $("pay-transfer").classList.toggle("on", m === "transferencia"); $("pay-cash").setAttribute("aria-pressed", m === "efectivo"); $("pay-transfer").setAttribute("aria-pressed", m === "transferencia"); renderDrivers() }
+        $("pay-cash").onclick = () => setPay("efectivo"); $("pay-transfer").onclick = () => setPay("transferencia");
+        function showWaitPay(driver) { if (payMethod === "transferencia") accountFor(driver.id).then(c => c && acctBox($("wait-pay"), driver.nombre, c, fareTotal())).catch(() => { }) }
+        // Soporte
+        let ticketId = store.get("vipdrive_ticket"), tkUns = null, msgUns = null, tk = null;
+        const supOpen = () => !$("sup").classList.contains("hidden");
+        function listenTicket() {
+            tkUns?.(); if (!ticketId) return;
+            tkUns = onSnapshot(doc(db, "soporte", ticketId), s => {
+                if (!s.exists()) { ticketId = ""; store.set("vipdrive_ticket", ""); return } tk = s.data(); const closed = tk.estado === "cerrado";
+                $("sup-closed").classList.toggle("hidden", !closed); $("sup-row").classList.toggle("hidden", closed);
+                if (tk.sin_leer_usuario) { if (supOpen()) updateDoc(doc(db, "soporte", ticketId), { sin_leer_usuario: false }).catch(() => { }); else $("sup-badge").classList.remove("hidden") }
+            });
+        }
+        function listenMsgs() {
+            msgUns?.(); msgUns = onSnapshot(query(collection(db, "soporte", ticketId, "mensajes"), orderBy("ts")), snap => {
+                $("sup-msgs").replaceChildren(...snap.docs.map(d => { const m = d.data(), el = document.createElement("div"); el.className = "max-w-[85%] rounded-2xl px-3 py-2 text-sm " + (m.de === "admin" ? "bg-gray-100 text-gray-800 mr-auto" : "bg-[#D4AF37] text-black ml-auto"); el.textContent = (m.de === "admin" ? "Soporte: " : "") + m.texto; return el }));
+                $("sup-msgs").scrollTop = $("sup-msgs").scrollHeight;
+            });
+        }
+        function supShow() {
+            $("sup").classList.remove("hidden"); $("sup-badge").classList.add("hidden");
+            if (ticketId) { $("sup-new").classList.add("hidden"); $("sup-chat").classList.remove("hidden"); listenMsgs(); updateDoc(doc(db, "soporte", ticketId), { sin_leer_usuario: false }).catch(() => { }) }
+            else { $("sup-chat").classList.add("hidden"); $("sup-new").classList.remove("hidden"); $("sup-name").value = $("passenger-name").value || store.get("vipdrive_name"); $("sup-phone").value = $("passenger-phone").value || store.get("vipdrive_phone") }
+        }
+        function supHide() { $("sup").classList.add("hidden"); msgUns?.(); msgUns = null }
+        $("sup-fab").onclick = supShow; $("sup-close").onclick = supHide; $("sup-bg").onclick = supHide;
+        $("sup-restart").onclick = () => { tkUns?.(); ticketId = ""; store.set("vipdrive_ticket", ""); msgUns?.(); supShow() };
+        $("sup-create").onclick = async () => {
+            const nombre = $("sup-name").value.trim(), telefono = $("sup-phone").value.trim(), texto = $("sup-text").value.trim(), tipo = $("sup-type").value;
+            if (!nombre || !telefono) return alert("Escribe tu nombre y teléfono."); if (texto.length < 5) return alert("Cuéntanos qué pasó (mínimo 5 caracteres).");
+            $("sup-create").disabled = true;
+            try {
+                const t = await addDoc(collection(db, "soporte"), { nombre, telefono, tipo, viaje: rideId || store.get("vipdrive_last_ride") || "", estado: "abierto", creado: serverTimestamp(), actualizado: serverTimestamp(), ultimo: texto.slice(0, 80), sin_leer_admin: true, sin_leer_usuario: false });
+                await addDoc(collection(db, "soporte", t.id, "mensajes"), { de: "usuario", texto, ts: serverTimestamp() });
+                ticketId = t.id; store.set("vipdrive_ticket", ticketId); $("sup-text").value = ""; listenTicket(); supShow();
+            } catch (e) { console.error(e); alert("No se pudo enviar. Intenta de nuevo.") } finally { $("sup-create").disabled = false }
+        };
+        async function supSend() {
+            const texto = $("sup-input").value.trim(); if (!texto || !ticketId) return; $("sup-input").value = "";
+            try { await addDoc(collection(db, "soporte", ticketId, "mensajes"), { de: "usuario", texto, ts: serverTimestamp() }); await updateDoc(doc(db, "soporte", ticketId), { actualizado: serverTimestamp(), ultimo: texto.slice(0, 80), sin_leer_admin: true, estado: "abierto" }) }
+            catch (e) { console.error(e); $("sup-input").value = texto; alert("No se pudo enviar el mensaje.") }
+        }
+        $("sup-send").onclick = supSend; $("sup-input").addEventListener("keydown", e => { if (e.key === "Enter") supSend() });
+        listenTicket();
         // Modo de asignación, perfil del conductor y carritos en vivo
         function setMode(m) { mode = m; $("mode-pick").classList.toggle("on", m === "pick"); $("mode-auto").classList.toggle("on", m === "auto"); $("mode-pick").setAttribute("aria-pressed", m === "pick"); $("mode-auto").setAttribute("aria-pressed", m === "auto"); $("pick-driver").classList.toggle("hidden", m === "auto"); $("auto-note").classList.toggle("hidden", m !== "auto"); if (m === "auto") { selectedDriver = null; $("selected-driver-label").textContent = "" } renderDrivers() }
         $("mode-pick").onclick = () => setMode("pick"); $("mode-auto").onclick = () => setMode("auto");
@@ -440,7 +565,7 @@
         const photoCache = new Map();
         function paintPhotos(d, ph) {
             const box = $("pf-photos"); box.replaceChildren();
-            if (!ph.length) { const e = document.createElement("div"); e.className = "w-full h-48 rounded-2xl bg-violet-50 grid place-items-center text-6xl"; e.textContent = "🚗"; box.append(e) }
+            if (!ph.length) { const e = document.createElement("div"); e.className = "w-full h-48 rounded-2xl bg-[#FBF6E6] grid place-items-center text-6xl"; e.textContent = "🚗"; box.append(e) }
             ph.forEach(u => { const im = new Image(); im.src = u; im.alt = "Foto de " + (d.nombre || "conductor"); im.className = "snap-center shrink-0 w-full h-56 object-cover rounded-2xl bg-gray-100"; box.append(im) });
             $("pf-count").textContent = ph.length > 1 ? `Desliza para ver las ${ph.length} fotos` : "";
         }
