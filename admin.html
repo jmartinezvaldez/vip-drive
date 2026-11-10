@@ -4,31 +4,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#10131b">
+    <meta name="theme-color" content="#0B0B0D">
     <meta name="robots" content="noindex,nofollow">
     <title>VIPDRIVE | Administración</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚘</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="vipdrive.css">
 </head>
 
 <body class="vd-admin text-white p-4 max-w-md mx-auto">
     <header class="pt-2">
-        <p class="font-extrabold tracking-wider text-violet-300">VIPDRIVE</p>
+        <p class="font-extrabold tracking-wider text-[#E8C766]">VIPDRIVE</p>
         <h1 class="text-2xl font-extrabold mt-1">Registro único de choferes</h1>
         <p class="text-xs text-gray-400 mt-1">Acceso solo con contraseña.</p>
     </header>
 
     <input id="pass" type="password" autocomplete="off" aria-label="Contraseña de administrador" placeholder="Contraseña de administrador"
-        class="w-full mt-4 p-3 rounded-xl bg-zinc-900 border border-white/10 focus:border-violet-400 outline-none text-base">
+        class="w-full mt-4 p-3 rounded-xl bg-zinc-900 border border-white/10 focus:border-[#D4AF37] outline-none text-base">
+
+    <div id="tabs" class="hidden mt-4 grid grid-cols-3 gap-1 p-1 rounded-2xl bg-zinc-900 text-xs font-bold">
+        <button type="button" data-tab="choferes" class="py-2 rounded-xl">Choferes</button>
+        <button type="button" data-tab="coment" class="py-2 rounded-xl">Comentarios</button>
+        <button type="button" data-tab="soporte" class="py-2 rounded-xl">Soporte<span id="sop-badge" class="hidden ml-1 rounded-full bg-red-500 text-white text-[10px] px-1.5"></span></button>
+    </div>
 
     <div id="form" class="hidden mt-4 bg-zinc-900/80 border border-white/10 rounded-2xl p-4 space-y-2">
         <div class="flex items-center justify-between">
             <h2 id="form-title" class="font-extrabold">Nuevo chofer</h2>
-            <button id="cancelar" type="button" class="hidden text-xs text-violet-300 underline">Cancelar edición</button>
+            <button id="cancelar" type="button" class="hidden text-xs text-[#E8C766] underline">Cancelar edición</button>
         </div>
         <input id="nombre" autocomplete="off" placeholder="Nombre completo" aria-label="Nombre completo" class="vd-in">
         <input id="celular" inputmode="tel" autocomplete="off" placeholder="Celular (será su usuario). Ej: 6691234567" aria-label="Celular" class="vd-in">
@@ -37,15 +43,34 @@
             <button id="gen" type="button" class="shrink-0 rounded-xl bg-white/10 px-3 text-xs font-bold">Generar</button>
         </div>
         <p id="clave-hint" class="text-[11px] text-gray-400"></p>
+        <input id="cuenta" inputmode="numeric" maxlength="22" autocomplete="off" placeholder="Cuenta para transferencias (16 dígitos)" aria-label="Cuenta para transferencias" class="vd-in">
         <div id="vehs" class="space-y-3"></div>
-        <button id="addveh" type="button" class="w-full py-2 rounded-xl border border-dashed border-white/20 text-sm text-violet-200">+ Agregar otro vehículo</button>
-        <button id="crear" class="w-full py-3 rounded-xl font-extrabold bg-gradient-to-br from-[#8a6dff] to-[#5b3fe0] disabled:opacity-50">CREAR CHOFER</button>
+        <button id="addveh" type="button" class="w-full py-2 rounded-xl border border-dashed border-white/20 text-sm text-[#F0D78C]">+ Agregar otro vehículo</button>
+        <button id="crear" class="w-full py-3 rounded-xl font-extrabold text-black bg-gradient-to-br from-[#F0D78C] to-[#B8901F] disabled:opacity-50">CREAR CHOFER</button>
         <p id="status" role="status" class="text-xs text-center text-green-400 min-h-[1rem]"></p>
     </div>
 
     <section id="registrados" class="hidden mt-5">
         <h2 class="font-extrabold">Conductores registrados <span id="total" class="text-gray-400 font-medium"></span></h2>
         <div id="lista" class="mt-2 space-y-2"></div>
+    </section>
+
+    <section id="view-coment" class="hidden mt-4">
+        <div class="flex gap-2 items-center"><select id="rate-filter" class="vd-in" aria-label="Filtrar por chofer"></select>
+            <label class="text-xs text-gray-300 shrink-0 flex items-center gap-1"><input id="rate-only" type="checkbox"> Solo con comentario</label></div>
+        <p id="rate-sum" class="text-xs text-gray-400 mt-2"></p>
+        <div id="rate-list" class="mt-2 space-y-2"></div>
+    </section>
+
+    <section id="view-soporte" class="hidden mt-4">
+        <div id="sop-list" class="space-y-2"></div>
+        <div id="sop-chat" class="hidden bg-zinc-900/80 border border-white/10 rounded-2xl p-3">
+            <div class="flex items-start justify-between gap-2"><div><p id="sop-head" class="font-extrabold text-sm"></p><p id="sop-sub" class="text-xs text-gray-400"></p></div>
+                <button id="sop-back" type="button" class="text-xs text-[#E8C766] underline shrink-0">← Volver</button></div>
+            <div id="sop-msgs" class="mt-3 space-y-2 max-h-[45vh] overflow-y-auto"></div>
+            <div class="flex gap-2 mt-3"><input id="sop-input" class="vd-in" placeholder="Responder…" aria-label="Respuesta"><button id="sop-send" type="button" class="shrink-0 rounded-xl bg-[#D4AF37] text-black px-4 font-bold text-sm">Enviar</button></div>
+            <button id="sop-toggle" type="button" class="mt-2 text-xs text-gray-400 underline"></button>
+        </div>
     </section>
 
     <nav class="vd-nav mt-6" aria-label="Secciones de VIPDRIVE">
@@ -56,7 +81,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, deleteDoc, addDoc, updateDoc, query, orderBy, limit, collection, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
         const app = initializeApp(firebaseConfig), db = getFirestore(app);
         const $ = id => document.getElementById(id);
@@ -70,7 +95,12 @@
             return btoa(String.fromCharCode(...new Uint8Array(bits)));
         }
 
-        $("pass").oninput = e => { if (e.target.value === "vip2026") { $("form").classList.remove("hidden"); $("registrados").classList.remove("hidden"); } };
+        function showTab(t) {
+            document.querySelectorAll("[data-tab]").forEach(b => { const on = b.dataset.tab === t; b.classList.toggle("bg-[#D4AF37]", on); b.classList.toggle("text-black", on); b.classList.toggle("text-gray-300", !on) });
+            ["form", "registrados"].forEach(k => $(k).classList.toggle("hidden", t !== "choferes")); $("view-coment").classList.toggle("hidden", t !== "coment"); $("view-soporte").classList.toggle("hidden", t !== "soporte");
+        }
+        $("tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) showTab(b.dataset.tab) });
+        $("pass").oninput = e => { if (e.target.value === "vip2026") { $("tabs").classList.remove("hidden"); showTab("choferes"); } };
         $("gen").onclick = () => { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; $("clave").value = [...crypto.getRandomValues(new Uint8Array(8))].map(n => a[n % a.length]).join(""); };
 
         function renderVehs() {
@@ -78,7 +108,7 @@
 <div class="flex items-center justify-between"><b class="text-sm">Vehículo ${i + 1}</b>${vehs.length > 1 ? `<button type="button" data-rmveh="${i}" class="text-xs text-red-400">Quitar</button>` : ""}</div>
 <div class="grid grid-cols-2 gap-2"><input data-vi="${i}" data-vf="auto" value="${esc(v.auto)}" placeholder="Modelo. Ej: Kia Rio blanco" aria-label="Modelo de auto" class="vd-in"><input data-vi="${i}" data-vf="placas" value="${esc(v.placas)}" placeholder="Placas" aria-label="Placas" class="vd-in"></div>
 <p class="text-[11px] text-gray-400">Fotos (hasta 5). La primera es la principal.</p>
-<div class="grid grid-cols-5 gap-2">${v.slots.map((s, k) => `<div class="relative aspect-square"><label class="block w-full h-full rounded-xl border border-dashed border-white/20 bg-black/50 overflow-hidden cursor-pointer grid place-items-center text-[10px] text-gray-400 text-center focus-within:border-violet-400">${s ? `<img src="${esc(s.prev || s.url)}" alt="Foto ${k + 1}" class="w-full h-full object-cover">` : `<span>+<br>${k ? "Foto " + (k + 1) : "Principal"}</span>`}<input type="file" accept="image/*" data-vi="${i}" data-slot="${k}" class="sr-only"></label>${s ? `<button type="button" data-vi="${i}" data-rm="${k}" aria-label="Quitar foto ${k + 1}" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-[11px] leading-none">×</button>` : ""}</div>`).join("")}</div></div>`).join("");
+<div class="grid grid-cols-5 gap-2">${v.slots.map((s, k) => `<div class="relative aspect-square"><label class="block w-full h-full rounded-xl border border-dashed border-white/20 bg-black/50 overflow-hidden cursor-pointer grid place-items-center text-[10px] text-gray-400 text-center focus-within:border-[#D4AF37]">${s ? `<img src="${esc(s.prev || s.url)}" alt="Foto ${k + 1}" class="w-full h-full object-cover">` : `<span>+<br>${k ? "Foto " + (k + 1) : "Principal"}</span>`}<input type="file" accept="image/*" data-vi="${i}" data-slot="${k}" class="sr-only"></label>${s ? `<button type="button" data-vi="${i}" data-rm="${k}" aria-label="Quitar foto ${k + 1}" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-600 text-[11px] leading-none">×</button>` : ""}</div>`).join("")}</div></div>`).join("");
         }
         $("vehs").addEventListener("input", e => { const { vi, vf } = e.target.dataset; if (vf) vehs[vi][vf] = e.target.value; });
         $("vehs").addEventListener("change", e => {
@@ -103,7 +133,7 @@
         }
 
         function resetForm() {
-            editingId = null; ["nombre", "celular", "clave"].forEach(k => $(k).value = ""); vehs = [newVeh()]; renderVehs(); $("clave-hint").textContent = "";
+            editingId = null; ["nombre", "celular", "clave", "cuenta"].forEach(k => $(k).value = ""); vehs = [newVeh()]; renderVehs(); $("clave-hint").textContent = "";
             $("form-title").textContent = "Nuevo chofer"; $("crear").textContent = "CREAR CHOFER"; $("cancelar").classList.add("hidden");
         }
         async function editDriver(id) {
@@ -114,6 +144,7 @@
             $("form-title").textContent = "Editando a " + (c.nombre || id); $("crear").textContent = "GUARDAR CAMBIOS"; $("cancelar").classList.remove("hidden");
             $("form").scrollIntoView({ behavior: "smooth", block: "start" }); say("Cargando fotos…", "gray");
             await Promise.all(vehs.map(async v => { try { const s = await getDoc(doc(db, "fotos_choferes", v.fotosDoc)); (s.exists() ? s.data().fotos || [] : []).slice(0, MAX).forEach((url, k) => v.slots[k] = { url }) } catch (e) { console.error(e) } }));
+            try { const s = await getDoc(doc(db, "cuentas", id)); if (s.exists() && editingId === id) $("cuenta").value = s.data().cuenta || "" } catch (e) { console.error(e) }
             say(""); if (editingId === id) renderVehs();
         }
         $("cancelar").onclick = () => { resetForm(); say(""); };
@@ -127,6 +158,7 @@
             if (!vehs.every(v => v.slots.some(Boolean))) return alert("Cada vehículo necesita al menos una foto.");
             if (!prev?.tiene_clave && !clave) return alert("Asigna una contraseña al chofer.");
             if (clave && clave.length < 6) return alert("La contraseña debe tener al menos 6 caracteres.");
+            const cuenta = $("cuenta").value.replace(/\D/g, ""); if (cuenta && cuenta.length !== 16) return alert("La cuenta para transferencias debe tener 16 dígitos.");
             if (!editingId && prev && !confirm("Ya existe un chofer con ese celular. ¿Reemplazar sus datos?")) return;
             $("crear").disabled = true;
             try {
@@ -141,7 +173,8 @@
                 }
                 const act = out.find(o => o.id === prev?.vehiculo_activo) || out[0];
                 const data = { id, nombre, celular, vehiculos: out, vehiculo_activo: act.id, auto: act.auto, placas: act.placas, thumb: act.thumb, foto: act.thumb, nfotos: act.nfotos, fotosDoc: act.fotosDoc, aprobado: true };
-                if (clave) data.tiene_clave = true;
+                if (clave) data.tiene_clave = true; data.tiene_cuenta = !!cuenta;
+                if (cuenta) await setDoc(doc(db, "cuentas", id), { cuenta, actualizado: serverTimestamp() }); else if (prev?.tiene_cuenta) await deleteDoc(doc(db, "cuentas", id));
                 if (!editingId) Object.assign(data, { disponible: true, registro_unico: true, fecha_registro: serverTimestamp() });
                 if (clave) { const salt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16)))); await setDoc(doc(db, "credenciales", id), { salt, hash: await hashPass(clave, salt), actualizado: serverTimestamp() }); }
                 await setDoc(doc(db, "choferes", id), data, { merge: true });
@@ -161,11 +194,57 @@
                 return `<div class="vd-row flex gap-3 items-center rounded-2xl bg-black/40 border border-white/10 p-3">
 <img src="${esc(c.thumb || c.foto || "https://i.pravatar.cc/100?u=" + encodeURIComponent(c.id))}" data-id="${esc(c.id)}" alt="" loading="lazy" class="w-12 h-12 rounded-full object-cover bg-zinc-800">
 <div class="min-w-0 flex-1"><p class="font-bold text-sm truncate">${esc(c.nombre)}</p><p class="text-xs text-gray-400 truncate">${esc(c.auto)}${c.placas ? " · " + esc(c.placas) : ""}</p><p class="text-xs text-gray-500 truncate">${esc(c.celular || c.id)} · ${nv} vehículo${nv === 1 ? "" : "s"}</p>
-<p class="text-xs ${c.tiene_clave ? "text-green-400" : "text-amber-400"}">${c.tiene_clave ? "🔑 Con contraseña" : "⚠ Sin contraseña"}</p></div>
+<p class="text-xs ${c.tiene_clave ? "text-green-400" : "text-amber-400"}">${c.tiene_clave ? "🔑 Con contraseña" : "⚠ Sin contraseña"}${c.tiene_cuenta ? " · 🏦 Con cuenta" : ""}</p></div>
 <div class="flex flex-col items-end gap-2"><span class="text-[10px] rounded-full px-2 py-1 ${live ? "bg-green-700 text-white" : "bg-zinc-800 text-gray-400"}">${live ? "En línea" : "Sin conexión"}</span>
-<button type="button" data-edit="${esc(c.id)}" class="text-xs font-bold rounded-lg bg-violet-600/30 text-violet-200 px-3 py-1.5">Editar</button></div></div>`;
+<button type="button" data-edit="${esc(c.id)}" class="text-xs font-bold rounded-lg bg-[#D4AF37]/25 text-[#F0D78C] px-3 py-1.5">Editar</button></div></div>`;
             }).join("");
             $("lista").querySelectorAll("img").forEach(i => i.onerror = () => { i.onerror = null; i.src = "https://i.pravatar.cc/100?u=" + encodeURIComponent(i.dataset.id); });
+        }, e => console.error(e));
+        // ---- Comentarios de pasajeros
+        let rates = [];
+        const when = ts => ts?.toDate ? ts.toDate().toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" }) : "";
+        function paintRates() {
+            const sel = $("rate-filter"), cur = sel.value, names = new Map(rates.map(r => [r.chofer_solicitado, r.chofer_nombre || r.chofer_solicitado]));
+            sel.innerHTML = '<option value="">Todos los choferes</option>' + [...names].map(([id, n]) => `<option value="${esc(id)}">${esc(n)}</option>`).join(""); sel.value = names.has(cur) ? cur : "";
+            const list = rates.filter(r => (!sel.value || r.chofer_solicitado === sel.value) && (!$("rate-only").checked || r.comentario)), avg = list.length ? list.reduce((s, r) => s + r.calificacion, 0) / list.length : 0;
+            $("rate-sum").textContent = list.length ? `${list.length} calificación${list.length === 1 ? "" : "es"} · promedio ★ ${avg.toFixed(1)}` : "Aún no hay calificaciones.";
+            $("rate-list").innerHTML = list.map(r => `<div class="rounded-2xl bg-black/40 border border-white/10 p-3"><div class="flex justify-between gap-2"><b class="text-sm">${esc(r.chofer_nombre || r.chofer_solicitado)}</b><span class="text-amber-400 text-sm" aria-label="${r.calificacion} de 5">${"★".repeat(r.calificacion)}${"☆".repeat(5 - r.calificacion)}</span></div>
+<p class="text-sm mt-1 ${r.comentario ? "" : "text-gray-500 italic"}">${r.comentario ? esc(r.comentario) : "Sin comentario"}</p><p class="text-[11px] text-gray-500 mt-1">${esc(r.cliente || "Pasajero")} · ${esc(when(r.calificado))}</p></div>`).join("");
+        }
+        $("rate-filter").onchange = paintRates; $("rate-only").onchange = paintRates;
+        onSnapshot(query(collection(db, "viajes"), orderBy("calificado", "desc"), limit(150)), snap => { rates = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.calificacion > 0); paintRates() }, e => console.error(e));
+
+        // ---- Soporte (chat con pasajeros)
+        let tickets = [], openId = null, msgsUns = null;
+        const tipoIcon = t => /perdido/i.test(t) ? "🎒" : /cobro|pago/i.test(t) ? "💳" : /queja/i.test(t) ? "⚠️" : "💬";
+        function paintTickets() {
+            $("sop-list").innerHTML = tickets.length ? tickets.map(t => `<button type="button" data-tk="${esc(t.id)}" class="w-full text-left rounded-2xl bg-black/40 border ${t.sin_leer_admin && t.estado !== "cerrado" ? "border-[#D4AF37]" : "border-white/10"} p-3">
+<div class="flex justify-between gap-2"><b class="text-sm truncate">${tipoIcon(t.tipo)} ${esc(t.tipo)} · ${esc(t.nombre)}</b><span class="text-[10px] rounded-full px-2 py-0.5 ${t.estado === "cerrado" ? "bg-zinc-800 text-gray-400" : "bg-green-700 text-white"}">${t.estado === "cerrado" ? "Cerrado" : "Abierto"}</span></div>
+<p class="text-xs text-gray-400 truncate mt-1">${t.sin_leer_admin && t.estado !== "cerrado" ? "● " : ""}${esc(t.ultimo)}</p><p class="text-[11px] text-gray-500 mt-1">${esc(t.telefono)} · ${esc(when(t.actualizado))}</p></button>`).join("") : '<p class="text-xs text-gray-400 bg-zinc-900/80 rounded-xl p-3">Aún no hay reportes de pasajeros.</p>';
+        }
+        $("sop-list").addEventListener("click", e => { const b = e.target.closest("[data-tk]"); if (b) openTicket(b.dataset.tk) });
+        function paintHead() {
+            const t = tickets.find(x => x.id === openId); if (!t) return;
+            $("sop-head").textContent = `${tipoIcon(t.tipo)} ${t.tipo} · ${t.nombre}`; $("sop-sub").textContent = `${t.telefono}${t.viaje ? " · Viaje " + t.viaje : ""}`; $("sop-toggle").textContent = t.estado === "cerrado" ? "Reabrir reporte" : "Marcar como resuelto";
+            if (t.sin_leer_admin) updateDoc(doc(db, "soporte", openId), { sin_leer_admin: false }).catch(() => { });
+        }
+        function openTicket(id) {
+            openId = id; $("sop-list").classList.add("hidden"); $("sop-chat").classList.remove("hidden"); paintHead(); msgsUns?.();
+            msgsUns = onSnapshot(query(collection(db, "soporte", id, "mensajes"), orderBy("ts")), snap => {
+                $("sop-msgs").innerHTML = snap.docs.map(d => { const m = d.data(); return `<div class="max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.de === "admin" ? "bg-[#D4AF37] text-black ml-auto" : "bg-zinc-800 mr-auto"}">${esc(m.texto)}</div>` }).join(""); $("sop-msgs").scrollTop = $("sop-msgs").scrollHeight;
+            });
+        }
+        $("sop-back").onclick = () => { openId = null; msgsUns?.(); $("sop-chat").classList.add("hidden"); $("sop-list").classList.remove("hidden") };
+        async function sopSend() {
+            const texto = $("sop-input").value.trim(); if (!texto || !openId) return; $("sop-input").value = "";
+            try { await addDoc(collection(db, "soporte", openId, "mensajes"), { de: "admin", texto, ts: serverTimestamp() }); await updateDoc(doc(db, "soporte", openId), { actualizado: serverTimestamp(), ultimo: "Soporte: " + texto.slice(0, 70), sin_leer_usuario: true }) }
+            catch (e) { console.error(e); $("sop-input").value = texto; alert("No se pudo enviar la respuesta.") }
+        }
+        $("sop-send").onclick = sopSend; $("sop-input").addEventListener("keydown", e => { if (e.key === "Enter") sopSend() });
+        $("sop-toggle").onclick = () => { const t = tickets.find(x => x.id === openId); if (t) updateDoc(doc(db, "soporte", openId), { estado: t.estado === "cerrado" ? "abierto" : "cerrado", actualizado: serverTimestamp() }).catch(console.error) };
+        onSnapshot(query(collection(db, "soporte"), orderBy("actualizado", "desc"), limit(60)), snap => {
+            tickets = snap.docs.map(d => ({ id: d.id, ...d.data() })); paintTickets(); if (openId) paintHead();
+            const n = tickets.filter(t => t.sin_leer_admin && t.estado !== "cerrado").length; $("sop-badge").textContent = n; $("sop-badge").classList.toggle("hidden", !n);
         }, e => console.error(e));
         resetForm();
     </script>
