@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#10131b">
+    <meta name="theme-color" content="#0B0B0D">
     <title>VIPDRIVE | Conductor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -16,7 +16,7 @@
 
         body {
             margin: 0;
-            background: #10131b;
+            background: #0B0B0D;
             color: #fff;
             font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif
         }
@@ -24,11 +24,11 @@
         #map {
             height: 48vh;
             min-height: 300px;
-            background: #242936
+            background: #26262E
         }
 
         .panel {
-            background: #171b26;
+            background: #15151A;
             border: 1px solid #ffffff12;
             border-radius: 24px;
             padding: 18px
@@ -43,7 +43,7 @@
         }
 
         .primary {
-            background: #7657f6;
+            background: #D4AF37;
             color: #fff
         }
 
@@ -89,12 +89,12 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚘</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vipdrive.css">
 </head>
 
 <body class="vd-driver">
-    <main class="max-w-xl mx-auto min-h-screen bg-[#10131b]">
+    <main class="max-w-xl mx-auto min-h-screen bg-[#0B0B0D]">
         <header class="px-4 py-3 flex justify-between items-center">
             <div>
                 <p class="font-black tracking-wider">VIPDRIVE</p>
@@ -109,6 +109,7 @@
                     <a id="navigate-pickup" target="_blank" rel="noopener">Navegar a recogida</a><a id="navigate-destination" target="_blank" rel="noopener">Navegar a destino</a>
                 </div>
                 <button id="arrived" type="button" class="btn primary">📍 YA LLEGUÉ</button>
+                <button id="stop-arrived" type="button" class="btn primary hidden">📍 LLEGUÉ A LA PARADA</button>
                 <button id="finish" type="button" class="btn green hidden">FINALIZAR VIAJE</button>
                 <button id="cancel-active" type="button" class="btn red mt-2">CANCELAR VIAJE</button>
             </div>
@@ -122,9 +123,9 @@
                 <h2 class="font-black text-lg">Entra a tu cuenta</h2>
                 <p class="text-xs muted mt-1">Tu usuario es tu número de celular. La contraseña te la da el administrador.</p>
                 <input id="gate-id" inputmode="numeric" autocomplete="off" placeholder="Celular. Ej: 6691234567" aria-label="Celular"
-                    class="mt-3 w-full rounded-xl bg-white/5 border border-white/10 p-3 text-base outline-none focus:border-violet-400">
+                    class="mt-3 w-full rounded-xl bg-white/5 border border-white/10 p-3 text-base outline-none focus:border-[#D4AF37]">
                 <input id="gate-pass" type="password" autocomplete="current-password" placeholder="Contraseña" aria-label="Contraseña"
-                    class="mt-2 w-full rounded-xl bg-white/5 border border-white/10 p-3 text-base outline-none focus:border-violet-400">
+                    class="mt-2 w-full rounded-xl bg-white/5 border border-white/10 p-3 text-base outline-none focus:border-[#D4AF37]">
                 <p id="gate-err" role="alert" class="text-xs text-red-400 mt-2 min-h-[1rem]"></p>
                 <button id="gate-go" class="btn primary mt-1">ENTRAR</button>
             </div>
@@ -132,7 +133,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <p class="text-[10px] muted uppercase tracking-widest">Tu cuenta</p>
-                        <h1 class="font-black text-lg">Conductor <span id="driver-name" class="text-violet-300">—</span>
+                        <h1 class="font-black text-lg">Conductor <span id="driver-name" class="text-[#E8C766]">—</span>
                         </h1>
                     </div><span id="gps-label" class="text-[10px] muted">GPS apagado</span>
                 </div>
@@ -142,7 +143,7 @@
                     pasajeros.</p>
             </div>
 
-            <div id="request-card" class="panel hidden border-yellow-400/50 bg-yellow-400 text-black blink">
+            <div id="request-card" class="panel hidden border-[#D4AF37]/50 bg-[#E8C766] text-black blink">
                 <p class="font-black text-lg">🔔 NUEVA SOLICITUD</p>
                 <p id="request-client" class="font-bold mt-2"></p>
                 <p id="request-phone" class="text-xs"></p>
@@ -164,6 +165,17 @@
                 </div>
             </div>
 
+            <div id="queue-card" class="panel hidden border-[#D4AF37]/50 bg-[#E8C766] text-black blink">
+                <p class="text-[10px] font-black">NUEVA SOLICITUD CERCA DE TU DESTINO</p>
+                <p id="queue-client" class="font-black mt-1"></p>
+                <p id="queue-info" class="text-xs mt-1"></p>
+                <div class="flex justify-between mt-2 text-sm"><span>Tarifa</span><b id="queue-fare"></b></div>
+                <div class="h-1.5 bg-black/20 rounded mt-2"><div id="queue-bar" class="h-1.5 bg-black rounded" style="width:100%"></div></div>
+                <p id="queue-count" class="text-xs mt-1"></p>
+                <button id="queue-accept" type="button" class="btn green mt-3">ACEPTAR Y ATENDER AL TERMINAR</button>
+                <button id="queue-reject" type="button" class="btn red mt-2">RECHAZAR</button>
+            </div>
+            <div id="queued-info" class="panel hidden border-[#D4AF37]/40 text-sm"><b>⏭ Siguiente viaje en cola</b><p id="queued-text" class="text-xs muted mt-1"></p></div>
             <div id="cancelled-card" class="panel hidden text-center">
                 <p class="text-xl font-black">VIAJE CANCELADO</p>
                 <p id="cancelled-reason" class="text-sm muted mt-2"></p><button id="dismiss-cancelled"
@@ -178,20 +190,24 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
         const db = getFirestore(initializeApp(firebaseConfig)), $ = id => document.getElementById(id);
         const store = { get(k) { try { return localStorage.getItem(k) || "" } catch { return "" } }, set(k, v) { try { localStorage.setItem(k, v) } catch { } } };
-        let wakeLock = null, lastWrite = 0, lastRoute = 0;
+        let wakeLock = null, lastWrite = 0, lastRoute = 0, queuedRide = null, queueTimer = null, queueUnsub = null, handlingQueue = false, nearEndFlag = false;
         function myPos() { const p = marker?.getLatLng?.(); return p ? [p.lat, p.lng] : [driverData?.lat || 23.2329, driverData?.lng || -106.4111] }
         function showEta(r) { if (!r || ride?.chofer_llego) return; const t = `🕒 Llegas en ~${Math.max(1, Math.round(r.duration / 60))} min · ${(r.distance / 1000).toFixed(1)} km`; if (ride?.estado === "aceptado") $("active-eta").textContent = t; else $("request-eta").textContent = t + " al pasajero" }
         let routeMode = "";
+        // Próximo punto del viaje: la siguiente parada pendiente o, si no quedan, el destino final
+        function nextTarget(r) { const ps = r?.paradas || [], i = r?.parada_actual || 0; return i < ps.length ? { lat: ps[i].lat, lng: ps[i].lng, stop: i } : { lat: r?.dest_lat, lng: r?.dest_lng, stop: -1 } }
         function syncArrival() {
-            const l = !!ride?.chofer_llego, s = !!ride?.viaje_iniciado, b = $("arrived");
-            b.classList.toggle("hidden", s); $("finish").classList.toggle("hidden", !s); b.disabled = false; b.textContent = l ? "▶ INICIAR VIAJE" : "📍 YA LLEGUÉ";
+            const l = !!ride?.chofer_llego, s = !!ride?.viaje_iniciado, b = $("arrived"), nt = nextTarget(ride), total = ride?.paradas?.length || 0;
+            b.classList.toggle("hidden", s); b.disabled = false; b.textContent = l ? "▶ INICIAR VIAJE" : "📍 YA LLEGUÉ";
+            $("stop-arrived").classList.toggle("hidden", !(s && nt.stop >= 0)); $("finish").classList.toggle("hidden", !(s && nt.stop < 0));
+            if (s && nt.stop >= 0) { $("stop-arrived").disabled = false; $("stop-arrived").textContent = `📍 LLEGUÉ A LA PARADA ${nt.stop + 1}${total > 1 ? " DE " + total : ""}` }
             if (!s) routeMode = "";
             if (l && !s && routeLine) { map.removeLayer(routeLine); routeLine = null }
-            if (s && routeMode !== "dest" && ride.dest_lat != null) { routeMode = "dest"; lastRoute = Date.now(); drawRoute(...myPos(), ride.dest_lat, ride.dest_lng) }
+            if (s) { const key = "t" + nt.stop; if (routeMode !== key && nt.lat != null) { routeMode = key; lastRoute = Date.now(); drawRoute(...myPos(), nt.lat, nt.lng) } }
         }
         async function keepAwake() { try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => { wakeLock = null }) } } catch (e) { console.warn(e) } }
         function letSleep() { if (wakeLock) { wakeLock.release().catch(() => { }); wakeLock = null } }
@@ -203,22 +219,72 @@
         function setMessage(t) { $("message").textContent = t }
         function show(id) { ["request-card", "active-card", "cancelled-card"].forEach(x => $(x).classList.add("hidden")); if (id) $(id).classList.remove("hidden") }
         function km(a, b, c, d) { const r = 6371, dl = (c - a) * Math.PI / 180, dn = (d - b) * Math.PI / 180, x = Math.sin(dl / 2) ** 2 + Math.cos(a * Math.PI / 180) * Math.cos(c * Math.PI / 180) * Math.sin(dn / 2) ** 2; return 2 * r * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)) }
-        async function drawRoute(a, b, c, d) { try { const u = `https://router.project-osrm.org/route/v1/driving/${b},${a};${d},${c}?overview=full&geometries=geojson`, r = await fetch(u), j = await r.json(); if (!j.routes?.length) throw Error(); const coords = j.routes[0].geometry.coordinates.map(p => [p[1], p[0]]); if (routeLine) map.removeLayer(routeLine); routeLine = L.polyline(coords, { color: "#7657f6", weight: 6 }).addTo(map); map.fitBounds(routeLine.getBounds(), { padding: [30, 30] }); return j.routes[0] } catch { if (routeLine) map.removeLayer(routeLine); routeLine = L.polyline([[a, b], [c, d]], { color: "#facc15", weight: 4, dashArray: "8 8" }).addTo(map); return null } }
+        async function drawRoute(a, b, c, d, via) { try { const u = `https://router.project-osrm.org/route/v1/driving/${b},${a};${(via || []).map(p => p[1] + "," + p[0] + ";").join("")}${d},${c}?overview=full&geometries=geojson`, r = await fetch(u), j = await r.json(); if (!j.routes?.length) throw Error(); const coords = j.routes[0].geometry.coordinates.map(p => [p[1], p[0]]); if (routeLine) map.removeLayer(routeLine); routeLine = L.polyline(coords, { color: "#B8860B", weight: 6 }).addTo(map); map.fitBounds(routeLine.getBounds(), { padding: [30, 30] }); return j.routes[0] } catch { if (routeLine) map.removeLayer(routeLine); routeLine = L.polyline([[a, b], [c, d]], { color: "#D4AF37", weight: 4, dashArray: "8 8" }).addTo(map); return null } }
         async function loadDriver() {
             const authed = store.get("vipdrive_auth");
             const showGate = id => { $("driver-status").textContent = "INICIA SESIÓN"; setMessage("Entra con tu celular y contraseña."); $("toggle-online").disabled = true; $("gate-id").value = id || store.get("vipdrive_driver_id"); $("id-gate").classList.remove("hidden") };
             if (!driverId) { if (authed) { location.replace("?id=" + encodeURIComponent(authed)); return } showGate(); return }
             if (authed !== driverId) { showGate(driverId); return }
             $("driver-id").textContent = "ID: " + driverId;
-            try { const snap = await getDoc(doc(db, "choferes", driverId)); if (!snap.exists()) { $("driver-status").textContent = "NO REGISTRADO"; setMessage("Este conductor no está registrado en VIPDRIVE."); $("toggle-online").disabled = true; return } driverData = snap.data(); store.set("vipdrive_driver_id", driverId); $("logout").classList.remove("hidden"); renderVehicles(); $("driver-name").textContent = driverData.nombre || "Conductor" }
+            try { const snap = await getDoc(doc(db, "choferes", driverId)); if (!snap.exists()) { $("driver-status").textContent = "NO REGISTRADO"; setMessage("Este conductor no está registrado en VIPDRIVE."); $("toggle-online").disabled = true; return } driverData = snap.data(); store.set("vipdrive_driver_id", driverId); $("logout").classList.remove("hidden"); renderVehicles(); $("driver-name").textContent = driverData.nombre || "Conductor"; resumeRide() }
             catch (e) { setMessage("No se pudo cargar tu cuenta. Revisa tu conexión y Firebase."); console.error(e) }
+        }
+        function fillActive() {
+            $("active-client").textContent = "Pasajero: " + (ride.cliente || ""); $("active-phone").textContent = "Teléfono: " + (ride.telefono || ""); $("active-destination").textContent = "Destino: " + (ride.destino || ""); $("active-fare").textContent = "$" + ride.tarifa_final; $("active-pickup").textContent = "Recoger en: " + (ride.origen || "Ubicación del pasajero"); $("active-eta").textContent = "";
+            $("navigate-pickup").href = `https://www.google.com/maps/dir/?api=1&destination=${ride.lat},${ride.lng}&travelmode=driving`; $("navigate-destination").href = `https://www.google.com/maps/dir/?api=1&destination=${ride.dest_lat},${ride.dest_lng}&travelmode=driving`; syncArrival();
+        }
+        // Si el conductor cerró la página con un viaje aceptado, lo retoma donde se quedó
+        async function resumeRide() {
+            try {
+                const snap = await getDocs(query(collection(db, "viajes"), where("chofer_solicitado", "==", driverId), where("estado", "==", "aceptado"))), now = Date.now(), ms = r => r.chofer_acepto?.toMillis?.() || 0;
+                const rides = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => now - ms(r) < 12 * 3600 * 1000).sort((a, b) => ms(b) - ms(a));
+                const qd = rides.find(r => r.en_cola); if (!rides.length || ride) return; if (qd && !rides.some(r => !r.en_cola)) { queuedRide = qd; promoteQueued(); return } if (qd) { queuedRide = qd; watchQueued() }
+                ride = rides.find(r => !r.en_cola); show("active-card"); fillActive(); watchRide(); setMessage("Retomamos tu viaje en curso. Termínalo para recibir nuevas solicitudes.");
+                if (!online) setOnline();
+                if (!ride.viaje_iniciado && !ride.chofer_llego) drawRoute(...myPos(), ride.lat, ride.lng).then(showEta);
+            } catch (e) { console.error(e); setMessage("No se pudo recuperar tu viaje en curso. Revisa tu conexión y recarga.") }
+        }
+        // ---- Viajes encimados: una solicitud nueva cerca del destino se acepta "en cola" y se atiende al terminar el viaje actual
+        function clearQueue(msg) { clearInterval(queueTimer); queueUnsub?.(); queueUnsub = null; queuedRide = null; $("queue-card").classList.add("hidden"); $("queued-info").classList.add("hidden"); if (msg) setMessage(msg) }
+        function renderQueue() {
+            const q = queuedRide; clearInterval(queueTimer); let s = 20;
+            $("queue-client").textContent = "Pasajero: " + (q.cliente || "Sin nombre");
+            $("queue-info").textContent = `Recoger en: ${q.origen || "ubicación del pasajero"} · a ${km(ride.dest_lat, ride.dest_lng, q.lat, q.lng).toFixed(1)} km de tu destino${q.paradas?.length ? ` · ${q.paradas.length} parada${q.paradas.length > 1 ? "s" : ""}` : ""} · Pago: ${q.metodo_pago === "transferencia" ? "transferencia" : "efectivo"}`;
+            $("queue-fare").textContent = "$" + (q.tarifa_final ?? "—"); $("queue-bar").style.width = "100%"; $("queue-count").textContent = "Tienes 20 segundos para responder"; $("queue-card").classList.remove("hidden");
+            queueTimer = setInterval(() => { s--; $("queue-bar").style.width = Math.max(0, s / 20 * 100) + "%"; $("queue-count").textContent = `Tiempo para responder: ${s}s`; if (s <= 0) rejectQueued(true) }, 1000);
+            try { new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg").play().catch(() => { }) } catch { }
+        }
+        function watchQueued() {
+            queueUnsub?.(); $("queued-text").textContent = `${queuedRide.cliente || "Pasajero"} · recoger en ${queuedRide.origen || "ubicación del pasajero"}`; $("queued-info").classList.remove("hidden");
+            queueUnsub = onSnapshot(doc(db, "viajes", queuedRide.id), s => { if (!queuedRide) return; if (!s.exists() || ["cancelado_cliente", "cancelado_chofer", "rechazado"].includes(s.data().estado)) clearQueue("El pasajero en cola canceló su solicitud.") });
+        }
+        async function acceptQueued() {
+            const q = queuedRide; if (!q || handlingQueue) return; handlingQueue = true; clearInterval(queueTimer);
+            try {
+                const ref = doc(db, "viajes", q.id), fresh = await getDoc(ref); if (!fresh.exists() || fresh.data().estado !== "solicitado_chofer") throw Error("Esa solicitud ya no está disponible.");
+                await updateDoc(ref, { estado: "aceptado", chofer: driverId, chofer_acepto: serverTimestamp(), en_cola: true });
+                queuedRide = { ...q, estado: "aceptado", en_cola: true }; $("queue-card").classList.add("hidden"); watchQueued(); setMessage("Solicitud en cola. La atenderás al terminar tu viaje actual.");
+            } catch (e) { clearQueue(e.message || "No se pudo aceptar la solicitud.") } finally { handlingQueue = false }
+        }
+        async function rejectQueued(auto = false) {
+            const q = queuedRide; if (!q || handlingQueue) return; handlingQueue = true; clearInterval(queueTimer);
+            try { const ref = doc(db, "viajes", q.id), f = await getDoc(ref); if (f.exists() && f.data().estado === "solicitado_chofer") await updateDoc(ref, { estado: "rechazado", motivo: auto ? "timeout 20s" : "rechazado" }) } catch (e) { console.error(e) }
+            finally { handlingQueue = false; clearQueue() }
+        }
+        function promoteQueued() {
+            const q = queuedRide; queueUnsub?.(); queueUnsub = null; queuedRide = null; $("queued-info").classList.add("hidden"); if (activeUnsub) activeUnsub(); if (routeLine) { map.removeLayer(routeLine); routeLine = null }
+            ride = { ...q, en_cola: false }; routeMode = ""; lastRoute = 0; show("active-card"); fillActive(); watchRide();
+            updateDoc(doc(db, "viajes", ride.id), { en_cola: false }).catch(console.error);
+            setDoc(doc(db, "choferes", driverId), { disponible: false, por_liberar: false, online: true, lastUpdate: serverTimestamp() }, { merge: true }).catch(console.error);
+            setMessage("Siguiente viaje: ve por el pasajero."); navigator.vibrate?.([200, 100, 200]); drawRoute(...myPos(), ride.lat, ride.lng).then(showEta);
         }
         function updatePosition(pos) {
             const { latitude, longitude, heading, speed } = pos.coords;
+            nearEndFlag = !!(ride?.estado === "aceptado" && ride.viaje_iniciado && nextTarget(ride).stop < 0 && ride.dest_lat != null && km(latitude, longitude, ride.dest_lat, ride.dest_lng) <= 1.5);
             if (marker) marker.setLatLng([latitude, longitude]); else marker = L.marker([latitude, longitude]).addTo(map).bindPopup("Tu ubicación");
             map.setView([latitude, longitude], 16);
-            if (Date.now() - lastWrite >= 10000) { lastWrite = Date.now(); setDoc(doc(db, "choferes", driverId), { lat: latitude, lng: longitude, heading: heading || 0, speed: speed || 0, disponible: !ride, online: true, lastUpdate: serverTimestamp() }, { merge: true }).catch(console.error) }
-            if (ride?.estado === "aceptado" && Date.now() - lastRoute > 15000) { if (ride.viaje_iniciado) { if (ride.dest_lat != null) { lastRoute = Date.now(); drawRoute(latitude, longitude, ride.dest_lat, ride.dest_lng) } } else if (!ride.chofer_llego && ride.lat != null) { lastRoute = Date.now(); drawRoute(latitude, longitude, ride.lat, ride.lng).then(showEta) } }
+            if (Date.now() - lastWrite >= 10000) { lastWrite = Date.now(); setDoc(doc(db, "choferes", driverId), { lat: latitude, lng: longitude, heading: heading || 0, speed: speed || 0, disponible: !ride, por_liberar: nearEndFlag && !queuedRide, libre_lat: nearEndFlag ? ride.dest_lat : null, libre_lng: nearEndFlag ? ride.dest_lng : null, online: true, lastUpdate: serverTimestamp() }, { merge: true }).catch(console.error) }
+            if (ride?.estado === "aceptado" && Date.now() - lastRoute > 15000) { if (ride.viaje_iniciado) { const nt = nextTarget(ride); if (nt.lat != null) { lastRoute = Date.now(); drawRoute(latitude, longitude, nt.lat, nt.lng) } } else if (!ride.chofer_llego && ride.lat != null) { lastRoute = Date.now(); drawRoute(latitude, longitude, ride.lat, ride.lng).then(showEta) } }
         }
         async function setOnline() {
             if (!navigator.geolocation) { setMessage("Este dispositivo no permite GPS."); return }
@@ -227,7 +293,7 @@
             navigator.geolocation.getCurrentPosition(async pos => {
                 try {
                     online = true; updatePosition(pos); watchId = navigator.geolocation.watchPosition(updatePosition, e => { setMessage("Se perdió la señal GPS. Revisa los permisos."); console.warn(e) }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
-                    await setDoc(doc(db, "choferes", driverId), { online: true, disponible: true, lastUpdate: serverTimestamp() }, { merge: true });
+                    await setDoc(doc(db, "choferes", driverId), { online: true, disponible: !ride, lastUpdate: serverTimestamp() }, { merge: true });
                     $("driver-status").textContent = "EN LÍNEA"; $("driver-status").className = "text-[10px] rounded-full bg-green-700 px-3 py-2"; $("gps-label").textContent = "GPS activo"; $("toggle-online").textContent = "DESACTIVAR DISPONIBILIDAD"; $("toggle-online").className = "btn red mt-4"; setMessage("Estás visible para recibir solicitudes."); listenRequests(); keepAwake(); renderVehicles();
                 } catch (e) { online = false; setMessage("No se pudo activar el GPS: " + e.message) }
                 finally { $("toggle-online").disabled = false }
@@ -238,11 +304,15 @@
             try { await setDoc(doc(db, "choferes", driverId), { online: false, disponible: false, lastUpdate: serverTimestamp() }, { merge: true }) } catch (e) { console.error(e) }
             $("driver-status").textContent = "DESCONECTADO"; $("driver-status").className = "text-[10px] rounded-full bg-gray-700 px-3 py-2"; $("gps-label").textContent = "GPS apagado"; $("toggle-online").textContent = "ACTIVAR DISPONIBILIDAD Y GPS"; $("toggle-online").className = "btn primary mt-4"; show(null); letSleep(); renderVehicles(); setMessage("Estás desconectado y ya no recibirás solicitudes.");
         }
-        $("toggle-online").onclick = () => online ? setOffline() : setOnline();
+        $("toggle-online").onclick = () => { if (online && ride?.estado === "aceptado") { setMessage("Termina tu viaje en curso antes de desconectarte."); return } online ? setOffline() : setOnline() };
         function listenRequests() {
             if (requestUnsub) requestUnsub();
             requestUnsub = onSnapshot(query(collection(db, "viajes"), where("chofer_solicitado", "==", driverId), where("estado", "==", "solicitado_chofer")), snap => {
-                if (ride || handlingRequest) return;
+                if (handlingRequest) return;
+                if (ride) {
+                    if (ride.estado === "aceptado") { const o = snap.docs.find(d => d.id !== ride.id && d.id !== queuedRide?.id); if (o) { if (!queuedRide && nearEndFlag) { queuedRide = { id: o.id, ...o.data() }; renderQueue() } else updateDoc(doc(db, "viajes", o.id), { estado: "rechazado", motivo: "conductor ocupado" }).catch(() => { }) } }
+                    return;
+                }
                 if (snap.empty) return;
                 const candidate = snap.docs[0]; ride = { id: candidate.id, ...candidate.data() }; show("request-card"); renderRequest(); watchRide();
             }, e => { setMessage("No se pudieron escuchar solicitudes. Revisa Firestore."); console.error(e) });
@@ -251,15 +321,15 @@
             const v = ride; $("request-client").textContent = "Pasajero: " + (v.cliente || "Sin nombre"); $("request-phone").textContent = "Teléfono: " + (v.telefono || "No proporcionado"); $("request-destination").textContent = "Destino: " + (v.destino || "No especificado"); $("request-fare").textContent = "$" + (v.tarifa_final ?? "—"); $("request-distance").textContent = (Number(v.km) || 0).toFixed(1) + " km"; $("pickup-preview").href = `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}&travelmode=driving`;
             if (requestTimer) clearInterval(requestTimer); seconds = 20; $("request-bar").style.width = "100%"; $("request-countdown").textContent = "Tienes 20 segundos para responder";
             requestTimer = setInterval(() => { seconds--; $("request-bar").style.width = Math.max(0, seconds / 20 * 100) + "%"; $("request-countdown").textContent = `Tiempo para responder: ${seconds}s`; if (seconds <= 0) rejectRide(true) }, 1000);
-            $("request-pickup").textContent = "Salida: " + (v.origen || "Ubicación del pasajero (ver mapa)");
+            $("request-pickup").textContent = "Salida: " + (v.origen || "Ubicación del pasajero (ver mapa)") + (v.paradas?.length ? ` · ${v.paradas.length} parada${v.paradas.length > 1 ? "s" : ""}` : "") + " · Pago: " + (v.metodo_pago === "transferencia" ? "transferencia" : "efectivo");
             { const [a, b] = myPos(); $("request-eta").textContent = "Calculando tiempo de llegada…"; drawRoute(a, b, v.lat, v.lng).then(r => r ? showEta(r) : $("request-eta").textContent = `A ${km(a, b, v.lat, v.lng).toFixed(1)} km del pasajero`) }
             try { const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg"); audio.play().catch(() => { }) } catch { }
         }
         function watchRide() {
             if (activeUnsub) activeUnsub(); activeUnsub = onSnapshot(doc(db, "viajes", ride.id), s => {
                 if (!s.exists()) return; const v = s.data(); ride = { ...ride, ...v }; syncArrival();
-                if (v.estado === "cancelado_cliente") { if (requestTimer) clearInterval(requestTimer); show("cancelled-card"); $("cancelled-reason").textContent = "El pasajero canceló el viaje."; setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); ride = null; if (routeLine) map.removeLayer(routeLine) }
-                if (v.estado === "finalizado") { show(null); ride = null; if (routeLine) map.removeLayer(routeLine); setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); setMessage("Viaje finalizado. Ya puedes recibir otra solicitud."); if (activeUnsub) activeUnsub() }
+                if (v.estado === "cancelado_cliente" && queuedRide && ride?.estado === "aceptado") { promoteQueued(); return } if (v.estado === "cancelado_cliente") { if (requestTimer) clearInterval(requestTimer); show("cancelled-card"); $("cancelled-reason").textContent = "El pasajero canceló el viaje."; setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); ride = null; if (routeLine) map.removeLayer(routeLine) }
+                if (v.estado === "finalizado" && queuedRide) { promoteQueued(); return } if (v.estado === "finalizado") { show(null); ride = null; if (routeLine) map.removeLayer(routeLine); setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); setMessage("Viaje finalizado. Ya puedes recibir otra solicitud."); if (activeUnsub) activeUnsub() }
                 if (v.estado === "cancelado_chofer" || v.estado === "rechazado") { show("cancelled-card"); $("cancelled-reason").textContent = "La solicitud ya no está activa."; ride = null }
             });
         }
@@ -281,7 +351,7 @@
             try { const ref = doc(db, "viajes", ride.id), fresh = await getDoc(ref); if (fresh.exists() && fresh.data().estado === "solicitado_chofer") await updateDoc(ref, { estado: "rechazado", motivo: auto ? "timeout 20s" : "rechazado" }); if (activeUnsub) activeUnsub(); ride = null; show(null); if (routeLine) map.removeLayer(routeLine); setMessage("Solicitud rechazada. Sigues disponible."); }
             catch (e) { setMessage("No se pudo rechazar la solicitud."); console.error(e) } finally { handlingRequest = false }
         }
-        $("accept").onclick = acceptRide; $("reject").onclick = () => rejectRide(false);
+        $("accept").onclick = acceptRide; $("reject").onclick = () => rejectRide(false); $("queue-accept").onclick = acceptQueued; $("queue-reject").onclick = () => rejectQueued(false);
         $("arrived").onclick = async () => {
             if (!ride || ride.estado !== "aceptado" || ride.viaje_iniciado) return; $("arrived").disabled = true;
             const arriving = !ride.chofer_llego;
@@ -290,8 +360,13 @@
                 ride = { ...ride, ...(arriving ? { chofer_llego: true } : { viaje_iniciado: true }) }; syncArrival(); navigator.vibrate?.(100);
             } catch (e) { console.error(e); $("arrived").disabled = false; alert(arriving ? "No se pudo avisar al pasajero. Revisa tu conexión." : "No se pudo iniciar el viaje. Revisa tu conexión.") }
         };
+        $("stop-arrived").onclick = async () => {
+            if (!ride || !ride.viaje_iniciado) return; const n = ride.parada_actual || 0; if (n >= (ride.paradas?.length || 0)) return; $("stop-arrived").disabled = true;
+            try { await updateDoc(doc(db, "viajes", ride.id), { parada_actual: n + 1, [`parada_${n + 1}_llegada`]: serverTimestamp() }); ride = { ...ride, parada_actual: n + 1 }; syncArrival(); navigator.vibrate?.(100) }
+            catch (e) { console.error(e); $("stop-arrived").disabled = false; alert("No se pudo registrar la parada. Revisa tu conexión.") }
+        };
         $("finish").onclick = async () => { if (!ride || ride.estado !== "aceptado") return; if (!confirm(`¿Finalizar el viaje por $${ride.tarifa_final}?`)) return; try { await updateDoc(doc(db, "viajes", ride.id), { estado: "finalizado", fin: serverTimestamp() }) } catch (e) { alert("No se pudo finalizar el viaje.") } };
-        $("cancel-active").onclick = async () => { if (!ride || !confirm("¿Seguro que deseas cancelar este viaje?")) return; try { await updateDoc(doc(db, "viajes", ride.id), { estado: "cancelado_chofer", fecha_cancel: serverTimestamp() }); await setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); ride = null; show("cancelled-card"); $("cancelled-reason").textContent = "Cancelaste el viaje."; if (routeLine) map.removeLayer(routeLine) } catch { alert("No se pudo cancelar el viaje.") } };
+        $("cancel-active").onclick = async () => { if (!ride || !confirm("¿Seguro que deseas cancelar este viaje?")) return; try { await updateDoc(doc(db, "viajes", ride.id), { estado: "cancelado_chofer", fecha_cancel: serverTimestamp() }); await setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); ride = null; if (queuedRide) { promoteQueued(); return } show("cancelled-card"); $("cancelled-reason").textContent = "Cancelaste el viaje."; if (routeLine) map.removeLayer(routeLine) } catch { alert("No se pudo cancelar el viaje.") } };
         $("dismiss-cancelled").onclick = () => { show(null); if (online) listenRequests() };
         window.addEventListener("beforeunload", () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId) });
         async function hashPass(pass, saltB64) {
@@ -312,15 +387,15 @@
             } catch (e) { console.error(e); err.textContent = "No se pudo iniciar sesión. Revisa tu conexión." } finally { $("gate-go").disabled = false }
         };
         $("gate-pass").addEventListener("keydown", e => { if (e.key === "Enter") $("gate-go").click() });
-        $("logout").onclick = async () => { try { if (online) await setOffline() } catch { } store.set("vipdrive_auth", ""); location.replace("chofer.html") };
+        $("logout").onclick = async () => { if (ride?.estado === "aceptado") { setMessage("Termina tu viaje en curso antes de cerrar sesión."); return } try { if (online) await setOffline() } catch { } store.set("vipdrive_auth", ""); location.replace("chofer.html") };
         function renderVehicles() {
             const vs = driverData?.vehiculos || [], card = $("veh-card"); if (!vs.length) return card.classList.add("hidden");
             const lock = online || !!ride; card.classList.remove("hidden"); $("veh-note").textContent = lock ? "Desconéctate para cambiar de vehículo." : "Elige el vehículo con el que vas a trabajar.";
             $("veh-list").replaceChildren(...vs.map(v => {
                 const b = document.createElement("button"), on = v.id === driverData.vehiculo_activo, im = document.createElement("img"), tx = document.createElement("div"), a = document.createElement("p"), p = document.createElement("p");
-                b.type = "button"; b.disabled = lock; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", on); b.className = "w-full flex items-center gap-3 rounded-2xl p-3 text-left border " + (on ? "border-violet-400 bg-violet-500/20" : "border-white/10 bg-white/5") + (lock && !on ? " opacity-50" : "");
+                b.type = "button"; b.disabled = lock; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", on); b.className = "w-full flex items-center gap-3 rounded-2xl p-3 text-left border " + (on ? "border-[#D4AF37] bg-[#D4AF37]/20" : "border-white/10 bg-white/5") + (lock && !on ? " opacity-50" : "");
                 im.src = v.thumb || ""; im.alt = ""; im.className = "w-12 h-12 rounded-xl object-cover bg-white/10"; tx.className = "flex-1 min-w-0"; a.className = "font-bold text-sm truncate"; a.textContent = v.auto; p.className = "text-xs muted"; p.textContent = v.placas || "";
-                tx.append(a, p); b.append(im, tx); if (on) { const k = document.createElement("span"); k.textContent = "✓"; k.className = "text-violet-300 font-black"; b.append(k) }
+                tx.append(a, p); b.append(im, tx); if (on) { const k = document.createElement("span"); k.textContent = "✓"; k.className = "text-[#E8C766] font-black"; b.append(k) }
                 b.onclick = () => chooseVehicle(v.id); return b;
             }));
         }
