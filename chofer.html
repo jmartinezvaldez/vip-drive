@@ -86,7 +86,8 @@
             text-decoration: none
         }
     </style>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚘</text></svg>">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
@@ -97,7 +98,7 @@
     <main class="max-w-xl mx-auto min-h-screen bg-[#0B0B0D]">
         <header class="px-4 py-3 flex justify-between items-center">
             <div>
-                <p class="font-black tracking-wider">VIPDRIVE</p>
+                <img src="logo.webp" alt="VIPDRIVE" class="vd-logo" width="56" height="39">
                 <p class="text-[10px] muted">CENTRO DEL CONDUCTOR</p>
             </div><span id="driver-status" class="text-[10px] rounded-full bg-gray-700 px-3 py-2">DESCONECTADO</span>
         </header>
@@ -195,6 +196,22 @@
         const db = getFirestore(initializeApp(firebaseConfig)), $ = id => document.getElementById(id);
         const store = { get(k) { try { return localStorage.getItem(k) || "" } catch { return "" } }, set(k, v) { try { localStorage.setItem(k, v) } catch { } } };
         let wakeLock = null, lastWrite = 0, lastRoute = 0, queuedRide = null, queueTimer = null, queueUnsub = null, handlingQueue = false, nearEndFlag = false;
+        // Sonido de moneda (estilo Mario Bros) que se repite mientras una solicitud esté en pantalla
+        let audioCtx = null, ringTimer = null;
+        function unlockAudio() { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === "suspended") audioCtx.resume() } catch { } }
+        ["pointerdown", "touchstart", "keydown"].forEach(ev => addEventListener(ev, unlockAudio, { passive: true }));
+        function coin() {
+            if (!audioCtx || audioCtx.state !== "running") return; const t = audioCtx.currentTime;
+            [[987.77, 0, .09], [1318.51, .09, .5]].forEach(([f, d, len]) => {
+                const o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.type = "square"; o.frequency.setValueAtTime(f, t + d);
+                g.gain.setValueAtTime(.0001, t + d); g.gain.exponentialRampToValueAtTime(.2, t + d + .008); g.gain.setValueAtTime(.2, t + d + len * .3); g.gain.exponentialRampToValueAtTime(.0001, t + d + len);
+                o.connect(g).connect(audioCtx.destination); o.start(t + d); o.stop(t + d + len + .02);
+            });
+        }
+        function startRing() { if (ringTimer) return; coin(); navigator.vibrate?.([200, 100, 200]); ringTimer = setInterval(coin, 1000) }
+        function stopRing() { clearInterval(ringTimer); ringTimer = null }
+        const ringCards = [$("request-card"), $("queue-card")], syncRing = () => ringCards.some(el => !el.classList.contains("hidden")) ? startRing() : stopRing();
+        ringCards.forEach(el => new MutationObserver(syncRing).observe(el, { attributes: true, attributeFilter: ["class"] }));
         function myPos() { const p = marker?.getLatLng?.(); return p ? [p.lat, p.lng] : [driverData?.lat || 23.2329, driverData?.lng || -106.4111] }
         function showEta(r) { if (!r || ride?.chofer_llego) return; const t = `🕒 Llegas en ~${Math.max(1, Math.round(r.duration / 60))} min · ${(r.distance / 1000).toFixed(1)} km`; if (ride?.estado === "aceptado") $("active-eta").textContent = t; else $("request-eta").textContent = t + " al pasajero" }
         let routeMode = "";
@@ -252,7 +269,7 @@
             $("queue-info").textContent = `Recoger en: ${q.origen || "ubicación del pasajero"} · a ${km(ride.dest_lat, ride.dest_lng, q.lat, q.lng).toFixed(1)} km de tu destino${q.paradas?.length ? ` · ${q.paradas.length} parada${q.paradas.length > 1 ? "s" : ""}` : ""} · Pago: ${q.metodo_pago === "transferencia" ? "transferencia" : "efectivo"}`;
             $("queue-fare").textContent = "$" + (q.tarifa_final ?? "—"); $("queue-bar").style.width = "100%"; $("queue-count").textContent = "Tienes 20 segundos para responder"; $("queue-card").classList.remove("hidden");
             queueTimer = setInterval(() => { s--; $("queue-bar").style.width = Math.max(0, s / 20 * 100) + "%"; $("queue-count").textContent = `Tiempo para responder: ${s}s`; if (s <= 0) rejectQueued(true) }, 1000);
-            try { new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg").play().catch(() => { }) } catch { }
+            
         }
         function watchQueued() {
             queueUnsub?.(); $("queued-text").textContent = `${queuedRide.cliente || "Pasajero"} · recoger en ${queuedRide.origen || "ubicación del pasajero"}`; $("queued-info").classList.remove("hidden");
@@ -323,7 +340,7 @@
             requestTimer = setInterval(() => { seconds--; $("request-bar").style.width = Math.max(0, seconds / 20 * 100) + "%"; $("request-countdown").textContent = `Tiempo para responder: ${seconds}s`; if (seconds <= 0) rejectRide(true) }, 1000);
             $("request-pickup").textContent = "Salida: " + (v.origen || "Ubicación del pasajero (ver mapa)") + (v.paradas?.length ? ` · ${v.paradas.length} parada${v.paradas.length > 1 ? "s" : ""}` : "") + " · Pago: " + (v.metodo_pago === "transferencia" ? "transferencia" : "efectivo");
             { const [a, b] = myPos(); $("request-eta").textContent = "Calculando tiempo de llegada…"; drawRoute(a, b, v.lat, v.lng).then(r => r ? showEta(r) : $("request-eta").textContent = `A ${km(a, b, v.lat, v.lng).toFixed(1)} km del pasajero`) }
-            try { const audio = new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg"); audio.play().catch(() => { }) } catch { }
+            
         }
         function watchRide() {
             if (activeUnsub) activeUnsub(); activeUnsub = onSnapshot(doc(db, "viajes", ride.id), s => {
