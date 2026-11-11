@@ -63,4 +63,12 @@ button:disabled { cursor: not-allowed; }
 .vd-in { width: 100%; padding: 13px; border-radius: 12px; background: #00000099; border: 1px solid #ffffff1a; outline: none; font-size: 16px; color: #fff; transition: border-color .2s, box-shadow .2s; }
 .vd-in:focus { border-color: var(--gold); box-shadow: 0 0 0 3px #D4AF3722; }
 
+/* Logo */
+.vd-logo { display: block; height: 40px; width: auto; }
+.vd-rider .topbar .vd-logo { height: 34px; }
+.vd-admin .vd-logo { height: 59px; margin-bottom: 2px; }
+
+/* Solicitudes del conductor: flotan sobre el mapa */
+.vd-driver #request-card, .vd-driver #queue-card { position: fixed; top: max(12px, env(safe-area-inset-top)); left: 12px; right: 12px; max-width: 520px; margin: 0 auto; z-index: 1200; max-height: calc(100vh - 24px); overflow-y: auto; box-shadow: 0 18px 50px #000b, 0 0 0 2px var(--gold); }
+
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
