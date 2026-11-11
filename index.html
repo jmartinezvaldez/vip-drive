@@ -245,6 +245,7 @@
                     </div>
                     <p id="waiting-status" class="text-xs text-[#8A6A00] font-bold mt-4">Notificando al conductor…</p>
                 </div>
+                <button id="chat-open" type="button" class="hidden primary mt-3">💬 Chat con tu conductor<span id="chat-badge" class="vd-dot hidden"></span></button>
                 <div id="wait-pay" class="hidden mt-3 rounded-2xl bg-[#FBF6E6] p-3 text-sm"></div>
                 <div id="rating-box" class="hidden mt-4 text-center">
                     <p id="rate-title" class="font-black text-lg">¿Cómo estuvo tu viaje?</p>
@@ -277,7 +278,7 @@
         </div>
     </div>
 
-    <button id="sup-fab" type="button" class="fixed right-3 top-[104px] z-[950] w-11 h-11 rounded-full bg-white shadow-lg text-xl" aria-label="Soporte">💬<span id="sup-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500"></span></button>
+    <button id="sup-fab" type="button" class="vd-sup" aria-label="Ayuda y soporte">💬 Ayuda · Soporte<span id="sup-badge" class="vd-dot hidden"></span></button>
     <div id="sup" class="hidden fixed inset-0 z-[1001]" role="dialog" aria-modal="true" aria-labelledby="sup-title">
         <div id="sup-bg" class="absolute inset-0 bg-black/50"></div>
         <div class="vd-sheet absolute bottom-0 inset-x-0 max-w-xl mx-auto bg-white rounded-t-[28px] p-4 flex flex-col" style="height:min(82vh,660px);padding-bottom:max(16px,env(safe-area-inset-bottom))">
@@ -294,6 +295,15 @@
                 <p id="sup-closed" class="hidden text-xs text-center text-gray-500 pb-2">Conversación cerrada. <button id="sup-restart" type="button" class="underline text-[#8A6A00]">Iniciar una nueva</button></p>
                 <div id="sup-row" class="flex gap-2"><input id="sup-input" class="field" maxlength="500" placeholder="Escribe tu mensaje"><button id="sup-send" type="button" class="primary" style="width:auto;padding:0 18px">Enviar</button></div>
             </div>
+        </div>
+    </div>
+
+    <div id="chat" class="hidden fixed inset-0 z-[1002]" role="dialog" aria-modal="true" aria-labelledby="chat-title">
+        <div id="chat-bg" class="absolute inset-0 bg-black/50"></div>
+        <div class="vd-sheet absolute bottom-0 inset-x-0 max-w-xl mx-auto bg-white rounded-t-[28px] p-4 flex flex-col" style="height:min(80vh,620px);padding-bottom:max(16px,env(safe-area-inset-bottom))">
+            <div class="flex justify-between items-center"><h2 id="chat-title" class="text-lg font-extrabold">Chat con tu conductor</h2><button id="chat-close" type="button" class="text-gray-500 px-2" aria-label="Cerrar">✕</button></div>
+            <div id="chat-msgs" class="flex-1 overflow-y-auto space-y-2 py-3"></div>
+            <div class="flex gap-2"><input id="chat-input" class="field" maxlength="300" placeholder="Escribe un mensaje" aria-label="Mensaje"><button id="chat-send" type="button" class="primary" style="width:auto;padding:0 18px">Enviar</button></div>
         </div>
     </div>
 
@@ -393,16 +403,16 @@
             const origen = pickupCustom ? $("pickup").value.trim() : await reverseLabel(myLat, myLng); const ref = await addDoc(collection(db, "viajes"), { cliente: name, telefono: phone, destino: $("destination").value.trim(), km: Number(routeKm.toFixed(2)), tarifa_final: fareTotal(), lat: myLat, lng: myLng, origen, paradas: stopPts().map(({ lat, lng, label }) => ({ lat, lng, label: label || "" })), tarifa_paradas: stopFee(), metodo_pago: payMethod, dest_lat: destLat, dest_lng: destLng, chofer_solicitado: driver.id, chofer_nombre: driver.nombre || "Conductor", modo_asignacion: mode === "auto" ? "mas_cercano" : "elegido", estado: "solicitado_chofer", fecha: serverTimestamp() });
             if (unsubscribeRide) unsubscribeRide();
             rideId = ref.id; store.set("vipdrive_last_ride", rideId); selectedDriver = driver; $("normal-screen").classList.add("hidden"); $("waiting-screen").classList.remove("hidden"); $("waiting-driver").textContent = driver.nombre || "Conductor"; $("waiting-fare").textContent = "$" + fareTotal(); $("waiting-distance").textContent = routeKm.toFixed(1) + " km"; $("waiting-status").textContent = "Notificando al conductor…";
-            const lost = msg => { $("waiting-status").textContent = msg; $("cancel-ride").textContent = "VOLVER A SOLICITAR"; $("cancel-ride").onclick = backToStart };
+            const lost = msg => { chatOff(); $("waiting-status").textContent = msg; $("cancel-ride").textContent = "VOLVER A SOLICITAR"; $("cancel-ride").onclick = backToStart };
             unsubscribeRide = onSnapshot(doc(db, "viajes", rideId), snap => {
                 if (rideCancelled || !snap.exists() || snap.id !== rideId) return; const v = snap.data();
-                if (v.estado === "aceptado") { const dd = drivers.get(driver.id) || driver; $("waiting-status").textContent = v.en_cola ? "⏳ Tu conductor está terminando un viaje cerca de ti y irá por ti en unos minutos." : v.viaje_iniciado ? (v.paradas?.length && (v.parada_actual || 0) < v.paradas.length ? `🛣️ Viaje en curso · próxima parada ${(v.parada_actual || 0) + 1} de ${v.paradas.length}.` : "🛣️ Viaje en curso hacia tu destino.") : v.chofer_llego ? "🚗 ¡Tu conductor llegó! Te está esperando." : "¡Viaje aceptado! El conductor va hacia tu ubicación."; if (v.chofer_llego && !arrivedNotified) { arrivedNotified = true; notifyArrival() } showWaitPay(driver); $("open-driver-route").href = `https://www.google.com/maps/search/?api=1&query=${dd.lat},${dd.lng}`; $("open-driver-route").classList.remove("hidden") }
+                if (v.estado === "aceptado") { const dd = drivers.get(driver.id) || driver; $("waiting-status").textContent = v.en_cola ? "⏳ Tu conductor está terminando un viaje cerca de ti y irá por ti en unos minutos." : v.viaje_iniciado ? (v.paradas?.length && (v.parada_actual || 0) < v.paradas.length ? `🛣️ Viaje en curso · próxima parada ${(v.parada_actual || 0) + 1} de ${v.paradas.length}.` : "🛣️ Viaje en curso hacia tu destino.") : v.chofer_llego ? "🚗 ¡Tu conductor llegó! Te está esperando." : "¡Viaje aceptado! El conductor va hacia tu ubicación."; if (v.chofer_llego && !arrivedNotified) { arrivedNotified = true; notifyArrival() } showWaitPay(driver); chatOn(driver); $("open-driver-route").href = `https://www.google.com/maps/search/?api=1&query=${dd.lat},${dd.lng}`; $("open-driver-route").classList.remove("hidden") }
                 else if (v.estado === "rechazado" || v.estado === "cancelado_chofer") {
                     const next = mode === "auto" ? availableDrivers().find(d => !tried.has(d.id)) : null;
                     if (next) { $("waiting-status").textContent = "Buscando al siguiente conductor cercano…"; sendRide(next, name, phone, tried).catch(() => lost("Ningún conductor cercano pudo tomar tu viaje. Puedes solicitarlo de nuevo.")) }
                     else lost(mode === "auto" ? "Ningún conductor cercano pudo tomar tu viaje. Puedes solicitarlo de nuevo." : "El conductor no pudo completar la solicitud. Puedes solicitar otro viaje.");
                 }
-                else if (v.estado === "cancelado_cliente") $("waiting-status").textContent = "Solicitud cancelada.";
+                else if (v.estado === "cancelado_cliente") { $("waiting-status").textContent = "Solicitud cancelada."; chatOff() }
                 else if (v.estado === "finalizado") showRating(snap.id, driver)
             });
         }
@@ -458,7 +468,7 @@
             try { new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg").play().catch(() => { }) } catch { }
         }
         function showRating(id, driver) {
-            if (ratingShown) return; ratingShown = true; let stars = 0;
+            if (ratingShown) return; ratingShown = true; chatOff(); let stars = 0;
             $("waiting-status").textContent = "Viaje finalizado. ¡Gracias por viajar con VIPDRIVE!"; $("cancel-ride").classList.add("hidden"); $("open-driver-route").classList.add("hidden");
             $("rate-title").textContent = `¿Cómo estuvo tu viaje con ${(driver.nombre || "tu conductor").split(" ")[0]}?`; $("rating-box").classList.remove("hidden");
             const box = $("stars"), paint = () => [...box.children].forEach((b, i) => { b.style.color = i < stars ? "#f5b301" : "#d1d5db"; b.setAttribute("aria-checked", i + 1 === stars) });
@@ -555,9 +565,29 @@
         }
         $("sup-send").onclick = supSend; $("sup-input").addEventListener("keydown", e => { if (e.key === "Enter") supSend() });
         listenTicket();
+        // Chat con el conductor: disponible desde que acepta hasta que finaliza el viaje
+        let chatUns = null, chatRide = null;
+        function chatPaint(snap) {
+            $("chat-msgs").replaceChildren(...snap.docs.map(d => { const m = d.data(), el = document.createElement("div"); el.className = "max-w-[85%] rounded-2xl px-3 py-2 text-sm " + (m.de === "usuario" ? "ml-auto bg-[#D4AF37] text-black" : "mr-auto bg-gray-100 text-gray-800"); el.textContent = m.texto; return el }));
+            $("chat-msgs").scrollTop = $("chat-msgs").scrollHeight;
+        }
+        function chatOn(driver) {
+            if (!rideId || chatRide === rideId) return; chatOff(); chatRide = rideId; $("chat-open").classList.remove("hidden"); $("chat-title").textContent = "Chat con " + (driver.nombre || "tu conductor").split(" ")[0]; let first = true;
+            chatUns = onSnapshot(query(collection(db, "viajes", chatRide, "chat"), orderBy("ts")), snap => {
+                chatPaint(snap); if ($("chat").classList.contains("hidden") && snap.docChanges().some(c => c.type === "added" && c.doc.data().de === "chofer")) { $("chat-badge").classList.remove("hidden"); if (!first) navigator.vibrate?.(120) } first = false;
+            });
+        }
+        function chatOff() { chatUns?.(); chatUns = null; chatRide = null; $("chat-open").classList.add("hidden"); $("chat").classList.add("hidden"); $("chat-badge").classList.add("hidden") }
+        async function chatSend() {
+            const texto = $("chat-input").value.trim(); if (!texto || !chatRide) return; $("chat-input").value = "";
+            try { await addDoc(collection(db, "viajes", chatRide, "chat"), { de: "usuario", texto: texto.slice(0, 300), ts: serverTimestamp() }) } catch (e) { console.error(e); $("chat-input").value = texto; alert("No se pudo enviar el mensaje.") }
+        }
+        $("chat-open").onclick = () => { $("chat").classList.remove("hidden"); $("chat-badge").classList.add("hidden"); $("chat-msgs").scrollTop = $("chat-msgs").scrollHeight };
+        $("chat-close").onclick = () => $("chat").classList.add("hidden"); $("chat-bg").onclick = () => $("chat").classList.add("hidden");
+        $("chat-send").onclick = chatSend; $("chat-input").addEventListener("keydown", e => { if (e.key === "Enter") chatSend() });
         // Volver a solicitar: regresa a la pantalla de inicio conservando destino, paradas, recogida y pago del viaje anterior
         function backToStart() {
-            unsubscribeRide?.(); unsubscribeRide = null; rideId = null; rideCancelled = false; requestBusy = false; selectedDriver = null; arrivedNotified = false; $("selected-driver-label").textContent = "";
+            chatOff(); unsubscribeRide?.(); unsubscribeRide = null; rideId = null; rideCancelled = false; requestBusy = false; selectedDriver = null; arrivedNotified = false; $("selected-driver-label").textContent = "";
             $("cancel-ride").textContent = cancelLabel; $("cancel-ride").onclick = cancelRideHandler; $("open-driver-route").classList.add("hidden"); $("wait-pay").classList.add("hidden");
             $("waiting-screen").classList.add("hidden"); $("normal-screen").classList.remove("hidden");
             setStatus("Ningún conductor tomó tu viaje. Tus datos siguen aquí: elige un conductor o el más cercano y vuelve a solicitarlo."); renderDrivers(); setButton(); window.scrollTo({ top: 0, behavior: "smooth" });
