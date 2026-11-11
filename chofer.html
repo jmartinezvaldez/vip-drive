@@ -112,6 +112,7 @@
                 <button id="arrived" type="button" class="btn primary">📍 YA LLEGUÉ</button>
                 <button id="stop-arrived" type="button" class="btn primary hidden">📍 LLEGUÉ A LA PARADA</button>
                 <button id="finish" type="button" class="btn green hidden">FINALIZAR VIAJE</button>
+                <button id="chat-open" type="button" class="hidden btn mt-2 border border-[#D4AF37]/50 bg-white/5 text-[#F0D78C]">💬 CHAT CON EL PASAJERO<span id="chat-badge" class="vd-dot hidden"></span></button>
                 <button id="cancel-active" type="button" class="btn red mt-2">CANCELAR VIAJE</button>
             </div>
             
@@ -120,6 +121,7 @@
                 <div id="veh-list" class="mt-2 space-y-2" role="radiogroup" aria-label="Vehículo de trabajo"></div>
                 <p id="veh-note" class="text-[11px] muted mt-2"></p>
             </div>
+            <button id="wallet-open" type="button" class="hidden w-full rounded-2xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 py-3 font-extrabold text-[#F0D78C]">💰 Mi cartera</button>
             <div id="id-gate" class="panel hidden">
                 <h2 class="font-black text-lg">Entra a tu cuenta</h2>
                 <p class="text-xs muted mt-1">Tu usuario es tu número de celular. La contraseña te la da el administrador.</p>
@@ -189,9 +191,43 @@
         </section>
     </main>
 
+    <div id="chat" class="hidden fixed inset-0 z-[1300]" role="dialog" aria-modal="true" aria-labelledby="chat-title">
+        <div id="chat-bg" class="absolute inset-0 bg-black/60"></div>
+        <div class="vd-sheet absolute bottom-0 inset-x-0 max-w-xl mx-auto rounded-t-[28px] bg-[#15151A] p-4 flex flex-col" style="height:min(80vh,620px);padding-bottom:max(16px,env(safe-area-inset-bottom))">
+            <div class="flex justify-between items-center"><h2 id="chat-title" class="font-extrabold">Chat con el pasajero</h2><button id="chat-close" type="button" class="text-gray-400 px-2" aria-label="Cerrar">✕</button></div>
+            <div id="chat-msgs" class="flex-1 overflow-y-auto space-y-2 py-3"></div>
+            <div class="flex gap-2 overflow-x-auto pb-2">
+                <button type="button" data-q="Voy en camino" class="shrink-0 rounded-full border border-white/15 px-3 py-1.5 text-xs">Voy en camino</button>
+                <button type="button" data-q="Ya llegué" class="shrink-0 rounded-full border border-white/15 px-3 py-1.5 text-xs">Ya llegué</button>
+                <button type="button" data-q="Estoy afuera" class="shrink-0 rounded-full border border-white/15 px-3 py-1.5 text-xs">Estoy afuera</button>
+                <button type="button" data-q="Gracias" class="shrink-0 rounded-full border border-white/15 px-3 py-1.5 text-xs">Gracias</button>
+            </div>
+            <div class="flex gap-2"><input id="chat-input" maxlength="300" placeholder="Escribe un mensaje" aria-label="Mensaje" class="flex-1 rounded-xl bg-white/5 border border-white/10 p-3 text-base outline-none focus:border-[#D4AF37]"><button id="chat-send" type="button" class="rounded-xl px-5 font-extrabold text-black" style="background:var(--gold-grad)">Enviar</button></div>
+        </div>
+    </div>
+
+    <div id="wallet" class="hidden fixed inset-0 z-[1300] bg-[#0B0B0D] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="wallet-title">
+        <div class="max-w-md mx-auto p-4" style="padding-bottom:max(24px,env(safe-area-inset-bottom))">
+            <div class="flex items-center justify-between"><h2 id="wallet-title" class="text-xl font-extrabold" style="font-family:var(--vd-serif)">Mi cartera</h2><button id="wallet-close" type="button" class="text-gray-400 px-2" aria-label="Cerrar">✕</button></div>
+            <div class="grid grid-cols-3 gap-1 p-1 rounded-2xl bg-white/5 mt-3 text-xs font-bold">
+                <button type="button" data-wp="dia" class="py-2 rounded-xl">Hoy</button><button type="button" data-wp="semana" class="py-2 rounded-xl">Semana</button><button type="button" data-wp="mes" class="py-2 rounded-xl">Mes</button>
+            </div>
+            <div class="mt-4 rounded-2xl p-4 border border-[#D4AF37]/40 bg-gradient-to-br from-[#1d1a10] to-[#0B0B0D]">
+                <p id="w-label" class="text-xs muted"></p><p id="w-total" class="text-4xl font-black text-[#D4AF37] mt-1">$0</p>
+                <div class="grid grid-cols-2 gap-2 mt-3 text-sm">
+                    <div class="rounded-xl bg-white/5 p-3"><p class="text-[11px] muted">Viajes</p><b id="w-trips">0</b></div><div class="rounded-xl bg-white/5 p-3"><p class="text-[11px] muted">Promedio por viaje</p><b id="w-avg">$0</b></div>
+                    <div class="rounded-xl bg-white/5 p-3"><p class="text-[11px] muted">Efectivo</p><b id="w-cash">$0</b></div><div class="rounded-xl bg-white/5 p-3"><p class="text-[11px] muted">Transferencia</p><b id="w-transfer">$0</b></div>
+                </div>
+            </div>
+            <h3 class="mt-5 font-extrabold text-sm">Viajes realizados</h3>
+            <div id="w-list" class="mt-2 space-y-2"></div>
+            <p class="text-[11px] muted mt-4">Las ganancias suman la tarifa de cada viaje finalizado (incluye paradas).</p>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, query, where, onSnapshot, updateDoc, serverTimestamp, getDocs, addDoc, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         const firebaseConfig = { apiKey: "AIzaSyDfpRv7mrAkTyETSYqmOTebVHokrbP_o2M", authDomain: "vip-drive-f19c1.firebaseapp.com", projectId: "vip-drive-f19c1", storageBucket: "vip-drive-f19c1.firebasestorage.app", messagingSenderId: "696888361898", appId: "1:696888361898:web:789595b0782015384521d3" };
         const db = getFirestore(initializeApp(firebaseConfig)), $ = id => document.getElementById(id);
         const store = { get(k) { try { return localStorage.getItem(k) || "" } catch { return "" } }, set(k, v) { try { localStorage.setItem(k, v) } catch { } } };
@@ -217,7 +253,7 @@
         let routeMode = "";
         // Próximo punto del viaje: la siguiente parada pendiente o, si no quedan, el destino final
         function nextTarget(r) { const ps = r?.paradas || [], i = r?.parada_actual || 0; return i < ps.length ? { lat: ps[i].lat, lng: ps[i].lng, stop: i } : { lat: r?.dest_lat, lng: r?.dest_lng, stop: -1 } }
-        function syncArrival() {
+        function syncArrival() { chatAttach();
             const l = !!ride?.chofer_llego, s = !!ride?.viaje_iniciado, b = $("arrived"), nt = nextTarget(ride), total = ride?.paradas?.length || 0;
             b.classList.toggle("hidden", s); b.disabled = false; b.textContent = l ? "▶ INICIAR VIAJE" : "📍 YA LLEGUÉ";
             $("stop-arrived").classList.toggle("hidden", !(s && nt.stop >= 0)); $("finish").classList.toggle("hidden", !(s && nt.stop < 0));
@@ -243,9 +279,55 @@
             if (!driverId) { if (authed) { location.replace("?id=" + encodeURIComponent(authed)); return } showGate(); return }
             if (authed !== driverId) { showGate(driverId); return }
             $("driver-id").textContent = "ID: " + driverId;
-            try { const snap = await getDoc(doc(db, "choferes", driverId)); if (!snap.exists()) { $("driver-status").textContent = "NO REGISTRADO"; setMessage("Este conductor no está registrado en VIPDRIVE."); $("toggle-online").disabled = true; return } driverData = snap.data(); store.set("vipdrive_driver_id", driverId); $("logout").classList.remove("hidden"); renderVehicles(); $("driver-name").textContent = driverData.nombre || "Conductor"; resumeRide() }
+            try { const snap = await getDoc(doc(db, "choferes", driverId)); if (!snap.exists()) { $("driver-status").textContent = "NO REGISTRADO"; setMessage("Este conductor no está registrado en VIPDRIVE."); $("toggle-online").disabled = true; return } driverData = snap.data(); store.set("vipdrive_driver_id", driverId); $("logout").classList.remove("hidden"); $("wallet-open").classList.remove("hidden"); renderVehicles(); $("driver-name").textContent = driverData.nombre || "Conductor"; resumeRide() }
             catch (e) { setMessage("No se pudo cargar tu cuenta. Revisa tu conexión y Firebase."); console.error(e) }
         }
+        // ---- Chat con el pasajero (mientras el viaje está aceptado)
+        let chatUns = null, chatRideId = null;
+        function ding() { if (!audioCtx || audioCtx.state !== "running") return; const t = audioCtx.currentTime, o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.type = "triangle"; o.frequency.value = 880; g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.18, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + .25); o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + .3) }
+        function chatPaint(snap) {
+            $("chat-msgs").replaceChildren(...snap.docs.map(d => { const m = d.data(), el = document.createElement("div"); el.className = "max-w-[85%] rounded-2xl px-3 py-2 text-sm " + (m.de === "chofer" ? "ml-auto bg-[#D4AF37] text-black" : "mr-auto bg-white/10"); el.textContent = m.texto; return el }));
+            $("chat-msgs").scrollTop = $("chat-msgs").scrollHeight;
+        }
+        function chatDetach() { chatUns?.(); chatUns = null; chatRideId = null; $("chat-open").classList.add("hidden"); $("chat").classList.add("hidden"); $("chat-badge").classList.add("hidden") }
+        function chatAttach() {
+            if (!ride?.id || chatRideId === ride.id) return; chatDetach(); chatRideId = ride.id; $("chat-open").classList.remove("hidden"); $("chat-title").textContent = "Chat con " + (ride.cliente || "el pasajero").split(" ")[0]; let first = true;
+            chatUns = onSnapshot(query(collection(db, "viajes", chatRideId, "chat"), orderBy("ts")), snap => {
+                chatPaint(snap); if ($("chat").classList.contains("hidden") && snap.docChanges().some(c => c.type === "added" && c.doc.data().de === "usuario")) { $("chat-badge").classList.remove("hidden"); if (!first) { ding(); navigator.vibrate?.(120) } } first = false;
+            });
+        }
+        async function chatSend(text) {
+            text = (text ?? $("chat-input").value).trim(); if (!text || !chatRideId) return; $("chat-input").value = "";
+            try { await addDoc(collection(db, "viajes", chatRideId, "chat"), { de: "chofer", texto: text.slice(0, 300), ts: serverTimestamp() }) } catch (e) { console.error(e); $("chat-input").value = text; alert("No se pudo enviar el mensaje.") }
+        }
+        $("chat-open").onclick = () => { $("chat").classList.remove("hidden"); $("chat-badge").classList.add("hidden"); $("chat-msgs").scrollTop = $("chat-msgs").scrollHeight };
+        $("chat-close").onclick = () => $("chat").classList.add("hidden"); $("chat-bg").onclick = () => $("chat").classList.add("hidden");
+        $("chat-send").onclick = () => chatSend(); $("chat-input").addEventListener("keydown", e => { if (e.key === "Enter") chatSend() });
+        document.querySelectorAll("[data-q]").forEach(b => b.onclick = () => chatSend(b.dataset.q));
+        new MutationObserver(() => { if ($("active-card").classList.contains("hidden")) chatDetach() }).observe($("active-card"), { attributes: true, attributeFilter: ["class"] });
+        // ---- Cartera virtual: viajes finalizados y ganancias por día, semana y mes
+        let walletRows = [], walletPeriod = "dia";
+        const money = n => "$" + (Math.round(n * 100) / 100).toLocaleString("es-MX");
+        function periodStart(p) { const d = new Date(); d.setHours(0, 0, 0, 0); if (p === "semana") d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); if (p === "mes") d.setDate(1); return d.getTime() }
+        function paintWallet() {
+            const names = { dia: "hoy", semana: "esta semana", mes: "este mes" }, rows = walletRows.filter(r => r.t >= periodStart(walletPeriod)), sum = rows.reduce((s, r) => s + r.monto, 0), cash = rows.filter(r => r.metodo_pago !== "transferencia").reduce((s, r) => s + r.monto, 0);
+            document.querySelectorAll("[data-wp]").forEach(b => { const on = b.dataset.wp === walletPeriod; b.classList.toggle("bg-[#D4AF37]", on); b.classList.toggle("text-black", on); b.classList.toggle("text-gray-300", !on) });
+            $("w-label").textContent = "Ganancias de " + names[walletPeriod]; $("w-total").textContent = money(sum); $("w-trips").textContent = rows.length; $("w-avg").textContent = rows.length ? money(sum / rows.length) : "$0"; $("w-cash").textContent = money(cash); $("w-transfer").textContent = money(sum - cash);
+            $("w-list").replaceChildren(...(rows.length ? rows.slice(0, 100).map(r => {
+                const el = document.createElement("div"), l = document.createElement("div"), a = document.createElement("p"), b = document.createElement("p"), rt = document.createElement("div"), mo = document.createElement("b"), me = document.createElement("p");
+                el.className = "flex items-center justify-between gap-3 rounded-2xl bg-white/5 border border-white/10 p-3"; l.className = "min-w-0"; a.className = "text-sm font-bold truncate"; a.textContent = r.destino || "Viaje"; b.className = "text-[11px] muted"; b.textContent = new Date(r.t).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + (r.cliente ? " · " + r.cliente : "");
+                rt.className = "text-right shrink-0"; mo.className = "text-[#D4AF37]"; mo.textContent = money(r.monto); me.className = "text-[10px] muted"; me.textContent = r.metodo_pago === "transferencia" ? "Transferencia" : "Efectivo"; l.append(a, b); rt.append(mo, me); el.append(l, rt); return el
+            }) : [Object.assign(document.createElement("p"), { className: "text-xs muted bg-white/5 rounded-xl p-3", textContent: "Aún no hay viajes finalizados en este periodo." })]));
+        }
+        async function openWallet() {
+            $("wallet").classList.remove("hidden"); $("w-list").textContent = "Cargando…";
+            try {
+                const snap = await getDocs(query(collection(db, "viajes"), where("chofer", "==", driverId), where("estado", "==", "finalizado")));
+                walletRows = snap.docs.map(d => { const r = d.data(); return { ...r, t: r.fin?.toMillis?.() || r.chofer_acepto?.toMillis?.() || 0, monto: Number(r.tarifa_final) || 0 } }).filter(r => r.t).sort((a, b) => b.t - a.t); paintWallet();
+            } catch (e) { console.error(e); $("w-list").textContent = "No se pudo cargar tu cartera. Revisa tu conexión." }
+        }
+        $("wallet-open").onclick = openWallet; $("wallet-close").onclick = () => $("wallet").classList.add("hidden");
+        document.querySelectorAll("[data-wp]").forEach(b => b.onclick = () => { walletPeriod = b.dataset.wp; paintWallet() });
         function fillActive() {
             $("active-client").textContent = "Pasajero: " + (ride.cliente || ""); $("active-phone").textContent = "Teléfono: " + (ride.telefono || ""); $("active-destination").textContent = "Destino: " + (ride.destino || ""); $("active-fare").textContent = "$" + ride.tarifa_final; $("active-pickup").textContent = "Recoger en: " + (ride.origen || "Ubicación del pasajero"); $("active-eta").textContent = "";
             $("navigate-pickup").href = `https://www.google.com/maps/dir/?api=1&destination=${ride.lat},${ride.lng}&travelmode=driving`; $("navigate-destination").href = `https://www.google.com/maps/dir/?api=1&destination=${ride.dest_lat},${ride.dest_lng}&travelmode=driving`; syncArrival();
