@@ -135,7 +135,8 @@
             display: none !important
         }
     </style>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚘</text></svg>">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
@@ -148,7 +149,7 @@
             <div id="map" aria-label="Mapa para elegir destino"></div>
             <header class="topbar">
                 <div>
-                    <div class="font-black tracking-wide">VIPDRIVE</div>
+                    <img src="logo.webp" alt="VIPDRIVE" class="vd-logo" width="48" height="34">
                     <div class="text-[10px] text-white/60">TU VIAJE, A TU MANERA</div>
                 </div><span id="driver-count" class="pill bg-white/10 text-white">Buscando conductores…</span>
             </header>
@@ -276,7 +277,7 @@
         </div>
     </div>
 
-    <button id="sup-fab" type="button" class="fixed right-3 top-[72px] z-[950] w-11 h-11 rounded-full bg-white shadow-lg text-xl" aria-label="Soporte">💬<span id="sup-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500"></span></button>
+    <button id="sup-fab" type="button" class="fixed right-3 top-[104px] z-[950] w-11 h-11 rounded-full bg-white shadow-lg text-xl" aria-label="Soporte">💬<span id="sup-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500"></span></button>
     <div id="sup" class="hidden fixed inset-0 z-[1001]" role="dialog" aria-modal="true" aria-labelledby="sup-title">
         <div id="sup-bg" class="absolute inset-0 bg-black/50"></div>
         <div class="vd-sheet absolute bottom-0 inset-x-0 max-w-xl mx-auto bg-white rounded-t-[28px] p-4 flex flex-col" style="height:min(82vh,660px);padding-bottom:max(16px,env(safe-area-inset-bottom))">
@@ -392,7 +393,7 @@
             const origen = pickupCustom ? $("pickup").value.trim() : await reverseLabel(myLat, myLng); const ref = await addDoc(collection(db, "viajes"), { cliente: name, telefono: phone, destino: $("destination").value.trim(), km: Number(routeKm.toFixed(2)), tarifa_final: fareTotal(), lat: myLat, lng: myLng, origen, paradas: stopPts().map(({ lat, lng, label }) => ({ lat, lng, label: label || "" })), tarifa_paradas: stopFee(), metodo_pago: payMethod, dest_lat: destLat, dest_lng: destLng, chofer_solicitado: driver.id, chofer_nombre: driver.nombre || "Conductor", modo_asignacion: mode === "auto" ? "mas_cercano" : "elegido", estado: "solicitado_chofer", fecha: serverTimestamp() });
             if (unsubscribeRide) unsubscribeRide();
             rideId = ref.id; store.set("vipdrive_last_ride", rideId); selectedDriver = driver; $("normal-screen").classList.add("hidden"); $("waiting-screen").classList.remove("hidden"); $("waiting-driver").textContent = driver.nombre || "Conductor"; $("waiting-fare").textContent = "$" + fareTotal(); $("waiting-distance").textContent = routeKm.toFixed(1) + " km"; $("waiting-status").textContent = "Notificando al conductor…";
-            const lost = msg => { $("waiting-status").textContent = msg; $("cancel-ride").textContent = "VOLVER A SOLICITAR"; $("cancel-ride").onclick = () => location.reload() };
+            const lost = msg => { $("waiting-status").textContent = msg; $("cancel-ride").textContent = "VOLVER A SOLICITAR"; $("cancel-ride").onclick = backToStart };
             unsubscribeRide = onSnapshot(doc(db, "viajes", rideId), snap => {
                 if (rideCancelled || !snap.exists() || snap.id !== rideId) return; const v = snap.data();
                 if (v.estado === "aceptado") { const dd = drivers.get(driver.id) || driver; $("waiting-status").textContent = v.en_cola ? "⏳ Tu conductor está terminando un viaje cerca de ti y irá por ti en unos minutos." : v.viaje_iniciado ? (v.paradas?.length && (v.parada_actual || 0) < v.paradas.length ? `🛣️ Viaje en curso · próxima parada ${(v.parada_actual || 0) + 1} de ${v.paradas.length}.` : "🛣️ Viaje en curso hacia tu destino.") : v.chofer_llego ? "🚗 ¡Tu conductor llegó! Te está esperando." : "¡Viaje aceptado! El conductor va hacia tu ubicación."; if (v.chofer_llego && !arrivedNotified) { arrivedNotified = true; notifyArrival() } showWaitPay(driver); $("open-driver-route").href = `https://www.google.com/maps/search/?api=1&query=${dd.lat},${dd.lng}`; $("open-driver-route").classList.remove("hidden") }
@@ -414,7 +415,8 @@
             try { const first = mode === "auto" ? availableDrivers()[0] : selectedDriver; if (!first) throw Error("No hay conductores disponibles en este momento."); await sendRide(first, name, phone, new Set()) }
             catch (e) { setStatus(e.message || "No se pudo enviar la solicitud. Intenta de nuevo."); requestBusy = false; setButton() }
         };
-        $("cancel-ride").onclick = async () => { if (!rideId) return; if (!confirm("¿Seguro que deseas cancelar la solicitud?")) return; rideCancelled = true; try { await updateDoc(doc(db, "viajes", rideId), { estado: "cancelado_cliente", fecha_cancel: serverTimestamp() }); $("waiting-status").textContent = "Solicitud cancelada."; if (unsubscribeRide) unsubscribeRide(); } catch { rideCancelled = false; alert("No se pudo cancelar. Comprueba tu conexión.") } };
+        const cancelLabel = $("cancel-ride").textContent.trim();
+        const cancelRideHandler = $("cancel-ride").onclick = async () => { if (!rideId) return; if (!confirm("¿Seguro que deseas cancelar la solicitud?")) return; rideCancelled = true; try { await updateDoc(doc(db, "viajes", rideId), { estado: "cancelado_cliente", fecha_cancel: serverTimestamp() }); $("waiting-status").textContent = "Solicitud cancelada."; if (unsubscribeRide) unsubscribeRide(); } catch { rideCancelled = false; alert("No se pudo cancelar. Comprueba tu conexión.") } };
         // Sugerencias de destino (Photon/OpenStreetMap, gratuito), llegada del conductor y calificación
         const phCache = new Map();
         async function photon(q, signal) {
@@ -553,6 +555,13 @@
         }
         $("sup-send").onclick = supSend; $("sup-input").addEventListener("keydown", e => { if (e.key === "Enter") supSend() });
         listenTicket();
+        // Volver a solicitar: regresa a la pantalla de inicio conservando destino, paradas, recogida y pago del viaje anterior
+        function backToStart() {
+            unsubscribeRide?.(); unsubscribeRide = null; rideId = null; rideCancelled = false; requestBusy = false; selectedDriver = null; arrivedNotified = false; $("selected-driver-label").textContent = "";
+            $("cancel-ride").textContent = cancelLabel; $("cancel-ride").onclick = cancelRideHandler; $("open-driver-route").classList.add("hidden"); $("wait-pay").classList.add("hidden");
+            $("waiting-screen").classList.add("hidden"); $("normal-screen").classList.remove("hidden");
+            setStatus("Ningún conductor tomó tu viaje. Tus datos siguen aquí: elige un conductor o el más cercano y vuelve a solicitarlo."); renderDrivers(); setButton(); window.scrollTo({ top: 0, behavior: "smooth" });
+        }
         // Modo de asignación, perfil del conductor y carritos en vivo
         function setMode(m) { mode = m; $("mode-pick").classList.toggle("on", m === "pick"); $("mode-auto").classList.toggle("on", m === "auto"); $("mode-pick").setAttribute("aria-pressed", m === "pick"); $("mode-auto").setAttribute("aria-pressed", m === "auto"); $("pick-driver").classList.toggle("hidden", m === "auto"); $("auto-note").classList.toggle("hidden", m !== "auto"); if (m === "auto") { selectedDriver = null; $("selected-driver-label").textContent = "" } renderDrivers() }
         $("mode-pick").onclick = () => setMode("pick"); $("mode-auto").onclick = () => setMode("auto");
