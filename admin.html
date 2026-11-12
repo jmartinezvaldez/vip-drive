@@ -26,10 +26,11 @@
     <input id="pass" type="password" autocomplete="off" aria-label="Contraseña de administrador" placeholder="Contraseña de administrador"
         class="w-full mt-4 p-3 rounded-xl bg-zinc-900 border border-white/10 focus:border-[#D4AF37] outline-none text-base">
 
-    <div id="tabs" class="hidden mt-4 grid grid-cols-3 gap-1 p-1 rounded-2xl bg-zinc-900 text-xs font-bold">
+    <div id="tabs" class="hidden mt-4 grid grid-cols-4 gap-1 p-1 rounded-2xl bg-zinc-900 text-xs font-bold">
         <button type="button" data-tab="choferes" class="py-2 rounded-xl">Choferes</button>
         <button type="button" data-tab="coment" class="py-2 rounded-xl">Comentarios</button>
         <button type="button" data-tab="soporte" class="py-2 rounded-xl">Soporte<span id="sop-badge" class="hidden ml-1 rounded-full bg-red-500 text-white text-[10px] px-1.5"></span></button>
+        <button type="button" data-tab="pen" class="py-2 rounded-xl">Multas<span id="pen-badge" class="hidden ml-1 rounded-full bg-red-500 text-white text-[10px] px-1.5"></span></button>
     </div>
 
     <div id="form" class="hidden mt-4 bg-zinc-900/80 border border-white/10 rounded-2xl p-4 space-y-2">
@@ -74,6 +75,12 @@
         </div>
     </section>
 
+    <section id="view-pen" class="hidden mt-4">
+        <p id="pen-sum" class="text-xs text-gray-400"></p>
+        <div id="pen-list" class="mt-2 space-y-2"></div>
+        <p class="text-[11px] text-gray-500 mt-3">Penalización de $20 por no presentarse o cancelar tarde. El pasajero no puede pedir viajes desde ese dispositivo o número hasta que la marques como pagada.</p>
+    </section>
+
     <nav class="vd-nav mt-6" aria-label="Secciones de VIPDRIVE">
         <a href="index.html">Pedir viaje</a>
         <a href="chofer.html">Soy conductor</a>
@@ -98,7 +105,7 @@
 
         function showTab(t) {
             document.querySelectorAll("[data-tab]").forEach(b => { const on = b.dataset.tab === t; b.classList.toggle("bg-[#D4AF37]", on); b.classList.toggle("text-black", on); b.classList.toggle("text-gray-300", !on) });
-            ["form", "registrados"].forEach(k => $(k).classList.toggle("hidden", t !== "choferes")); $("view-coment").classList.toggle("hidden", t !== "coment"); $("view-soporte").classList.toggle("hidden", t !== "soporte");
+            ["form", "registrados"].forEach(k => $(k).classList.toggle("hidden", t !== "choferes")); $("view-coment").classList.toggle("hidden", t !== "coment"); $("view-soporte").classList.toggle("hidden", t !== "soporte"); $("view-pen").classList.toggle("hidden", t !== "pen");
         }
         $("tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) showTab(b.dataset.tab) });
         $("pass").oninput = e => { if (e.target.value === "vip2026") { $("tabs").classList.remove("hidden"); showTab("choferes"); } };
@@ -247,6 +254,25 @@
             tickets = snap.docs.map(d => ({ id: d.id, ...d.data() })); paintTickets(); if (openId) paintHead();
             const n = tickets.filter(t => t.sin_leer_admin && t.estado !== "cerrado").length; $("sop-badge").textContent = n; $("sop-badge").classList.toggle("hidden", !n);
         }, e => console.error(e));
+        // ---- Penalizaciones de pasajeros
+        const motivoTxt = { no_show: "No se presentó al viaje", cancelacion_tardia: "Canceló con el conductor en camino" };
+        let pens = [];
+        function paintPens() {
+            const pend = pens.filter(p => p.estado === "pendiente"), list = [...pend, ...pens.filter(p => p.estado !== "pendiente")];
+            $("pen-badge").textContent = pend.length; $("pen-badge").classList.toggle("hidden", !pend.length);
+            $("pen-sum").textContent = pend.length ? `${pend.length} pendiente${pend.length > 1 ? "s" : ""} · $${pend.reduce((s, p) => s + Number(p.monto || 0), 0)} por cobrar` : "No hay penalizaciones pendientes.";
+            $("pen-list").innerHTML = list.map(p => `<div class="rounded-2xl bg-black/40 border ${p.estado === "pendiente" ? "border-red-400/60" : "border-white/10"} p-3">
+<div class="flex justify-between gap-2"><b class="text-sm">${esc(p.cliente || "Pasajero")}</b><b class="${p.estado === "pendiente" ? "text-red-300" : "text-green-400"}">$${esc(p.monto)}</b></div>
+<p class="text-xs text-gray-300 mt-1">${esc(motivoTxt[p.motivo] || p.motivo)} · ${esc(p.telefono)}</p>
+<p class="text-[11px] text-gray-500">${esc(when(p.creado))} · Dispositivo ${esc(String(p.device || "").slice(0, 8))}${p.estado === "pagada" ? " · Pagada " + esc(when(p.pagado)) : p.estado === "anulada" ? " · Anulada" : ""}</p>
+${p.estado === "pendiente" ? `<div class="flex gap-2 mt-2"><button type="button" data-pen-pay="${esc(p.id)}" class="flex-1 rounded-xl bg-[#D4AF37] text-black font-bold text-sm py-2">Marcar como pagada</button><button type="button" data-pen-void="${esc(p.id)}" class="rounded-xl border border-white/20 text-xs px-3">Anular</button></div>` : ""}</div>`).join("") || '<p class="text-xs text-gray-400 bg-zinc-900/80 rounded-xl p-3">Sin registros.</p>';
+        }
+        $("pen-list").addEventListener("click", e => {
+            const pay = e.target.closest("[data-pen-pay]"), vo = e.target.closest("[data-pen-void]"), id = (pay || vo)?.dataset[pay ? "penPay" : "penVoid"]; if (!id) return;
+            if (!confirm(pay ? "¿Confirmas que recibiste el pago de la penalización?" : "¿Anular esta penalización?")) return;
+            updateDoc(doc(db, "penalizaciones", id), pay ? { estado: "pagada", pagado: serverTimestamp() } : { estado: "anulada", anulado: serverTimestamp() }).catch(err => { console.error(err); alert("No se pudo actualizar.") });
+        });
+        onSnapshot(query(collection(db, "penalizaciones"), orderBy("creado", "desc"), limit(100)), snap => { pens = snap.docs.map(d => ({ id: d.id, ...d.data() })); paintPens() }, e => console.error(e));
         resetForm();
     </script>
 </body>
