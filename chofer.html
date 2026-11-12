@@ -109,6 +109,9 @@
                     <p id="active-client"></p><p id="active-phone"></p><p id="active-pickup"></p><p id="active-eta"></p><p id="active-destination"></p><b id="active-fare"></b>
                     <a id="navigate-pickup" target="_blank" rel="noopener">Navegar a recogida</a><a id="navigate-destination" target="_blank" rel="noopener">Navegar a destino</a>
                 </div>
+                <div id="wait-box" class="hidden rounded-2xl border border-[#D4AF37]/50 bg-[#D4AF37]/10 p-3 text-center mb-3">
+                    <p class="text-[11px] muted">Tiempo de espera del pasajero</p><p id="wait-time" class="text-4xl font-black text-[#D4AF37]">00:00</p><p id="wait-fee" class="text-sm font-bold mt-1"></p>
+                </div>
                 <button id="arrived" type="button" class="btn primary">📍 YA LLEGUÉ</button>
                 <button id="stop-arrived" type="button" class="btn primary hidden">📍 LLEGUÉ A LA PARADA</button>
                 <button id="finish" type="button" class="btn green hidden">FINALIZAR VIAJE</button>
@@ -146,26 +149,17 @@
                     pasajeros.</p>
             </div>
 
-            <div id="request-card" class="panel hidden border-[#D4AF37]/50 bg-[#E8C766] text-black blink">
-                <p class="font-black text-lg">🔔 NUEVA SOLICITUD</p>
-                <p id="request-client" class="font-bold mt-2"></p>
-                <p id="request-phone" class="text-xs"></p>
-                <p id="request-destination" class="text-xs mt-1"></p>
-                <p id="request-pickup" class="text-xs mt-1"></p>
-                <p id="request-eta" class="text-sm font-black mt-2"></p>
-                <div class="flex items-end justify-between mt-3"><b id="request-fare" class="text-3xl"></b><span
-                        id="request-distance" class="text-xs font-bold"></span></div>
-                <div class="bg-black/20 rounded-full h-2 mt-3 overflow-hidden">
-                    <div id="request-bar" class="bg-black h-2 w-full"></div>
+            <div id="request-card" class="panel hidden vd-req" role="alertdialog" aria-live="assertive" aria-label="Nueva solicitud de viaje">
+                <div class="flex items-center justify-between gap-2"><p class="vd-req-title">🔔 NUEVA SOLICITUD</p><span id="request-distance" class="vd-chip"></span></div>
+                <div class="vd-req-bar"><div id="request-bar" class="vd-req-bar-fill"></div></div>
+                <p id="request-countdown" class="vd-req-count">Tienes 20 segundos para responder</p>
+                <b id="request-fare" class="vd-req-fare"></b>
+                <p id="request-eta" class="vd-req-eta"></p>
+                <div class="vd-req-info">
+                    <p id="request-client"></p><p id="request-phone"></p><p id="request-pickup"></p><p id="request-destination"></p>
                 </div>
-                <p id="request-countdown" class="text-[10px] font-bold mt-1">Tienes 20 segundos para responder</p>
-                <a id="pickup-preview" target="_blank" rel="noopener"
-                    class="block text-center rounded-xl bg-white/80 py-2 text-xs font-black mt-3">VER RECOGIDA EN
-                    MAPS</a>
-                <div class="flex gap-2 mt-3"><button id="accept"
-                        class="flex-1 bg-black text-white rounded-xl py-4 font-black">ACEPTAR</button><button
-                        id="reject" class="flex-1 bg-white text-black rounded-xl py-4 font-black">RECHAZAR</button>
-                </div>
+                <a id="pickup-preview" target="_blank" rel="noopener" class="vd-req-link">VER RECOGIDA EN MAPS</a>
+                <div class="grid grid-cols-2 gap-3 mt-4"><button id="accept" type="button" class="vd-req-accept">ACEPTAR</button><button id="reject" type="button" class="vd-req-reject">RECHAZAR</button></div>
             </div>
 
             <div id="queue-card" class="panel hidden border-[#D4AF37]/50 bg-[#E8C766] text-black blink">
@@ -190,6 +184,20 @@
             <nav class="vd-nav" aria-label="Secciones de VIPDRIVE"><a href="index.html">Pedir viaje</a><a href="chofer.html" aria-current="page">Soy conductor</a><a href="admin.html">Admin</a></nav>
         </section>
     </main>
+
+    <div id="cobro" class="hidden fixed inset-0 z-[1400]" role="dialog" aria-modal="true" aria-labelledby="cobro-title">
+        <div class="absolute inset-0 bg-black/85"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="vd-sheet w-full max-w-md rounded-3xl border-2 border-[#D4AF37] bg-[#0B0B0D] p-5 text-center">
+                <p id="cobro-title" class="text-xs font-black tracking-widest text-[#D4AF37]">MONTO A COBRAR</p>
+                <p id="cobro-total" class="text-6xl font-black text-[#D4AF37] mt-2">$0</p>
+                <p id="cobro-method" class="mt-2 text-lg font-bold"></p>
+                <div id="cobro-detail" class="mt-3 rounded-2xl bg-white/5 p-3 text-sm space-y-1"></div>
+                <button id="cobro-ok" type="button" class="vd-req-accept w-full mt-5"></button>
+                <button id="cobro-back" type="button" class="w-full mt-2 py-3 text-sm text-gray-400 underline">Volver</button>
+            </div>
+        </div>
+    </div>
 
     <div id="chat" class="hidden fixed inset-0 z-[1300]" role="dialog" aria-modal="true" aria-labelledby="chat-title">
         <div id="chat-bg" class="absolute inset-0 bg-black/60"></div>
@@ -221,7 +229,7 @@
             </div>
             <h3 class="mt-5 font-extrabold text-sm">Viajes realizados</h3>
             <div id="w-list" class="mt-2 space-y-2"></div>
-            <p class="text-[11px] muted mt-4">Las ganancias suman la tarifa de cada viaje finalizado (incluye paradas).</p>
+            <p class="text-[11px] muted mt-4">Las ganancias suman la tarifa de cada viaje finalizado (incluye paradas y tiempo de espera).</p>
         </div>
     </div>
 
@@ -323,7 +331,7 @@
             $("wallet").classList.remove("hidden"); $("w-list").textContent = "Cargando…";
             try {
                 const snap = await getDocs(query(collection(db, "viajes"), where("chofer", "==", driverId), where("estado", "==", "finalizado")));
-                walletRows = snap.docs.map(d => { const r = d.data(); return { ...r, t: r.fin?.toMillis?.() || r.chofer_acepto?.toMillis?.() || 0, monto: Number(r.tarifa_final) || 0 } }).filter(r => r.t).sort((a, b) => b.t - a.t); paintWallet();
+                walletRows = snap.docs.map(d => { const r = d.data(); return { ...r, t: r.fin?.toMillis?.() || r.chofer_acepto?.toMillis?.() || 0, monto: Number(r.monto_cobrado ?? r.tarifa_final) || 0 } }).filter(r => r.t).sort((a, b) => b.t - a.t); paintWallet();
             } catch (e) { console.error(e); $("w-list").textContent = "No se pudo cargar tu cartera. Revisa tu conexión." }
         }
         $("wallet-open").onclick = openWallet; $("wallet-close").onclick = () => $("wallet").classList.add("hidden");
@@ -455,8 +463,11 @@
             if (!ride || ride.estado !== "aceptado" || ride.viaje_iniciado) return; $("arrived").disabled = true;
             const arriving = !ride.chofer_llego;
             try {
-                await updateDoc(doc(db, "viajes", ride.id), arriving ? { chofer_llego: true, llegada: serverTimestamp() } : { viaje_iniciado: true, inicio: serverTimestamp() });
-                ride = { ...ride, ...(arriving ? { chofer_llego: true } : { viaje_iniciado: true }) }; syncArrival(); navigator.vibrate?.(100);
+                const now = Date.now(), waitMs = arriving ? 0 : Math.max(0, now - (ride.llegada_ms || now)), fee = waitFee(waitMs);
+                const extra = arriving ? { chofer_llego: true, llegada: serverTimestamp(), llegada_ms: now } : { viaje_iniciado: true, inicio: serverTimestamp(), espera_seg: Math.round(waitMs / 1000), tarifa_espera: fee };
+                const local = arriving ? { chofer_llego: true, llegada_ms: now } : { viaje_iniciado: true, espera_seg: Math.round(waitMs / 1000), tarifa_espera: fee };
+                await updateDoc(doc(db, "viajes", ride.id), extra);
+                ride = { ...ride, ...local }; syncArrival(); navigator.vibrate?.(100);
             } catch (e) { console.error(e); $("arrived").disabled = false; alert(arriving ? "No se pudo avisar al pasajero. Revisa tu conexión." : "No se pudo iniciar el viaje. Revisa tu conexión.") }
         };
         $("stop-arrived").onclick = async () => {
@@ -464,7 +475,28 @@
             try { await updateDoc(doc(db, "viajes", ride.id), { parada_actual: n + 1, [`parada_${n + 1}_llegada`]: serverTimestamp() }); ride = { ...ride, parada_actual: n + 1 }; syncArrival(); navigator.vibrate?.(100) }
             catch (e) { console.error(e); $("stop-arrived").disabled = false; alert("No se pudo registrar la parada. Revisa tu conexión.") }
         };
-        $("finish").onclick = async () => { if (!ride || ride.estado !== "aceptado") return; if (!confirm(`¿Finalizar el viaje por $${ride.tarifa_final}?`)) return; try { await updateDoc(doc(db, "viajes", ride.id), { estado: "finalizado", fin: serverTimestamp() }) } catch (e) { alert("No se pudo finalizar el viaje.") } };
+        // Espera gratis de 3 min; después $3 por minuto iniciado hasta que el conductor inicia el viaje
+        const waitFee = ms => 3 * Math.ceil(Math.max(0, ms - 180000) / 60000), mmss = s => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+        setInterval(() => {
+            const on = ride?.estado === "aceptado" && ride.chofer_llego && !ride.viaje_iniciado && ride.llegada_ms; $("wait-box").classList.toggle("hidden", !on); if (!on) return;
+            const ms = Date.now() - ride.llegada_ms; $("wait-time").textContent = mmss(Math.floor(ms / 1000));
+            $("wait-fee").textContent = ms < 180000 ? `Espera gratis · quedan ${mmss(Math.ceil((180000 - ms) / 1000))}` : `Tiempo extra · +$${waitFee(ms)} ($3 por minuto)`;
+        }, 1000);
+        // Al finalizar: pantalla con el monto a cobrar y confirmación del pago
+        const rideTotal = r => Number(r?.tarifa_final || 0) + Number(r?.tarifa_espera || 0);
+        function openCobro() {
+            if (!ride || ride.estado !== "aceptado") return; const tr = ride.metodo_pago === "transferencia", fee = Number(ride.tarifa_espera || 0);
+            $("cobro-total").textContent = money(rideTotal(ride)); $("cobro-method").textContent = tr ? "🏦 Pago por transferencia" : "💵 Pago en efectivo";
+            $("cobro-detail").replaceChildren(...[["Tarifa del viaje", money(Number(ride.tarifa_final || 0))], ...(fee ? [[`Espera extra (${Math.round(fee / 3)} min)`, "+" + money(fee)]] : []), ["Pasajero", ride.cliente || "—"]].map(([k, v]) => { const el = document.createElement("div"), a = document.createElement("span"), b = document.createElement("b"); el.className = "flex justify-between gap-3"; a.className = "muted"; a.textContent = k; b.textContent = v; el.append(a, b); return el }));
+            $("cobro-ok").textContent = tr ? "CONFIRMAR TRANSFERENCIA" : "RECIBÍ EFECTIVO"; $("cobro-ok").disabled = false; $("cobro").classList.remove("hidden");
+        }
+        $("finish").onclick = openCobro; $("cobro-back").onclick = () => $("cobro").classList.add("hidden");
+        $("cobro-ok").onclick = async () => {
+            if (!ride) return; $("cobro-ok").disabled = true;
+            try { await updateDoc(doc(db, "viajes", ride.id), { estado: "finalizado", fin: serverTimestamp(), monto_cobrado: rideTotal(ride), pago_confirmado: true, pago_metodo: ride.metodo_pago === "transferencia" ? "transferencia" : "efectivo" }); $("cobro").classList.add("hidden") }
+            catch (e) { console.error(e); $("cobro-ok").disabled = false; alert("No se pudo finalizar el viaje. Revisa tu conexión.") }
+        };
+        new MutationObserver(() => { if ($("active-card").classList.contains("hidden")) $("cobro").classList.add("hidden") }).observe($("active-card"), { attributes: true, attributeFilter: ["class"] });
         $("cancel-active").onclick = async () => { if (!ride || !confirm("¿Seguro que deseas cancelar este viaje?")) return; try { await updateDoc(doc(db, "viajes", ride.id), { estado: "cancelado_chofer", fecha_cancel: serverTimestamp() }); await setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); ride = null; if (queuedRide) { promoteQueued(); return } show("cancelled-card"); $("cancelled-reason").textContent = "Cancelaste el viaje."; if (routeLine) map.removeLayer(routeLine) } catch { alert("No se pudo cancelar el viaje.") } };
         $("dismiss-cancelled").onclick = () => { show(null); if (online) listenRequests() };
         window.addEventListener("beforeunload", () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId) });
