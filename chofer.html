@@ -381,7 +381,7 @@
         function promoteQueued() {
             const q = queuedRide; queueUnsub?.(); queueUnsub = null; queuedRide = null; $("queued-info").classList.add("hidden"); if (activeUnsub) activeUnsub(); if (routeLine) { map.removeLayer(routeLine); routeLine = null }
             ride = { ...q, en_cola: false }; routeMode = ""; lastRoute = 0; show("active-card"); fillActive(); watchRide();
-            updateDoc(doc(db, "viajes", ride.id), { en_cola: false }).catch(console.error);
+            updateDoc(doc(db, "viajes", ride.id), { en_cola: false, chofer_acepto: serverTimestamp(), chofer_lat: myPos()[0], chofer_lng: myPos()[1] }).catch(console.error);
             setDoc(doc(db, "choferes", driverId), { disponible: false, por_liberar: false, online: true, lastUpdate: serverTimestamp() }, { merge: true }).catch(console.error);
             setMessage("Siguiente viaje: ve por el pasajero."); navigator.vibrate?.([200, 100, 200]); drawRoute(...myPos(), ride.lat, ride.lng).then(showEta);
         }
@@ -444,7 +444,7 @@
             if (!ride || handlingRequest) return; handlingRequest = true; if (requestTimer) clearInterval(requestTimer);
             try {
                 const ref = doc(db, "viajes", ride.id), fresh = await getDoc(ref); if (!fresh.exists() || fresh.data().estado !== "solicitado_chofer") throw Error("Esta solicitud ya no está disponible.");
-                await updateDoc(ref, { estado: "aceptado", chofer: driverId, chofer_acepto: serverTimestamp() });
+                await updateDoc(ref, { estado: "aceptado", chofer: driverId, chofer_acepto: serverTimestamp(), chofer_lat: myPos()[0], chofer_lng: myPos()[1] });
                 ride = { ...ride, estado: "aceptado" }; await setDoc(doc(db, "choferes", driverId), { disponible: false, online: true, lastUpdate: serverTimestamp() }, { merge: true });
                 show("active-card"); $("active-client").textContent = "Pasajero: " + (ride.cliente || ""); $("active-phone").textContent = "Teléfono: " + (ride.telefono || ""); $("active-destination").textContent = "Destino: " + (ride.destino || ""); $("active-fare").textContent = "$" + ride.tarifa_final; $("active-pickup").textContent = "Recoger en: " + (ride.origen || "Ubicación del pasajero"); $("active-eta").textContent = ""; syncArrival();
                 $("navigate-pickup").href = `https://www.google.com/maps/dir/?api=1&destination=${ride.lat},${ride.lng}&travelmode=driving`;
@@ -478,9 +478,9 @@
         // Espera gratis de 3 min; después $3 por minuto iniciado hasta que el conductor inicia el viaje
         const waitFee = ms => 3 * Math.ceil(Math.max(0, ms - 180000) / 60000), mmss = s => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
         setInterval(() => {
-            const on = ride?.estado === "aceptado" && ride.chofer_llego && !ride.viaje_iniciado && ride.llegada_ms; $("wait-box").classList.toggle("hidden", !on); if (!on) return;
+            const on = ride?.estado === "aceptado" && ride.chofer_llego && !ride.viaje_iniciado && ride.llegada_ms; $("wait-box").classList.toggle("hidden", !on); const noShow = !!on && Date.now() - ride.llegada_ms >= 300000, want = noShow ? "🚫 PASAJERO NO SE PRESENTÓ · CANCELAR" : "CANCELAR VIAJE"; if ($("cancel-active").textContent !== want) $("cancel-active").textContent = want; if (!on) return;
             const ms = Date.now() - ride.llegada_ms; $("wait-time").textContent = mmss(Math.floor(ms / 1000));
-            $("wait-fee").textContent = ms < 180000 ? `Espera gratis · quedan ${mmss(Math.ceil((180000 - ms) / 1000))}` : `Tiempo extra · +$${waitFee(ms)} ($3 por minuto)`;
+            $("wait-fee").textContent = ms < 180000 ? `Espera gratis · quedan ${mmss(Math.ceil((180000 - ms) / 1000))}` : `Tiempo extra · +$${waitFee(ms)} ($3 por minuto)` + (ms >= 300000 ? " · Ya puedes cancelar: el pasajero no se presentó" : "");
         }, 1000);
         // Al finalizar: pantalla con el monto a cobrar y confirmación del pago
         const rideTotal = r => Number(r?.tarifa_final || 0) + Number(r?.tarifa_espera || 0);
@@ -497,7 +497,10 @@
             catch (e) { console.error(e); $("cobro-ok").disabled = false; alert("No se pudo finalizar el viaje. Revisa tu conexión.") }
         };
         new MutationObserver(() => { if ($("active-card").classList.contains("hidden")) $("cobro").classList.add("hidden") }).observe($("active-card"), { attributes: true, attributeFilter: ["class"] });
-        $("cancel-active").onclick = async () => { if (!ride || !confirm("¿Seguro que deseas cancelar este viaje?")) return; try { await updateDoc(doc(db, "viajes", ride.id), { estado: "cancelado_chofer", fecha_cancel: serverTimestamp() }); await setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); ride = null; if (queuedRide) { promoteQueued(); return } show("cancelled-card"); $("cancelled-reason").textContent = "Cancelaste el viaje."; if (routeLine) map.removeLayer(routeLine) } catch { alert("No se pudo cancelar el viaje.") } };
+        $("cancel-active").onclick = async () => { if (!ride) return; const noShow = ride.estado === "aceptado" && ride.chofer_llego && !ride.viaje_iniciado && ride.llegada_ms && Date.now() - ride.llegada_ms >= 300000;
+            if (!confirm(noShow ? "El pasajero no se presentó después de 5 minutos.\n\nAl cancelar se le aplicará una penalización de $20 y no podrá pedir otro viaje hasta pagarla al administrador.\n\n¿Cancelar el viaje?" : "¿Seguro que deseas cancelar este viaje?")) return;
+            try { await updateDoc(doc(db, "viajes", ride.id), { estado: "cancelado_chofer", fecha_cancel: serverTimestamp(), ...(noShow ? { motivo: "pasajero_no_se_presento", penalizado: true } : {}) });
+                if (noShow) await addDoc(collection(db, "penalizaciones"), { device: ride.device || "", telefono: ride.telefono || "", cliente: ride.cliente || "", monto: 20, motivo: "no_show", viaje: ride.id, chofer: driverId, estado: "pendiente", creado: serverTimestamp() }); await setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); ride = null; if (queuedRide) { promoteQueued(); return } show("cancelled-card"); $("cancelled-reason").textContent = noShow ? "Se aplicó la penalización de $20 al pasajero." : "Cancelaste el viaje."; if (routeLine) map.removeLayer(routeLine) } catch { alert("No se pudo cancelar el viaje.") } };
         $("dismiss-cancelled").onclick = () => { show(null); if (online) listenRequests() };
         window.addEventListener("beforeunload", () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId) });
         async function hashPass(pass, saltB64) {
