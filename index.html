@@ -167,6 +167,10 @@
                     </div>
                     <span class="pill bg-[#FBF6E6] text-[#8A6A00]">MAZATLÁN</span>
                 </div>
+                <div id="pen-banner" class="hidden mb-3 rounded-2xl border border-red-300 bg-red-50 p-3 text-sm" role="alert">
+                    <p id="pen-text" class="font-bold text-red-800"></p>
+                    <button id="pen-help" type="button" class="secondary w-full mt-2">💬 Contactar a soporte para pagar</button>
+                </div>
                 <label class="text-xs font-bold text-gray-500">RECOGIDA</label>
                 <div class="flex gap-2 mt-1 mb-3">
                     <input id="pickup" class="field" autocomplete="off" value="Mi ubicación actual" aria-label="Punto de recogida">
@@ -317,7 +321,7 @@
         const $ = id => document.getElementById(id);
         const store = { get(k) { try { return localStorage.getItem(k) || "" } catch { return "" } }, set(k, v) { try { localStorage.setItem(k, v) } catch { } } };
         const DEFAULT = { lat: 23.2329, lng: -106.4111 };
-        let pickupCustom = false, stops = [], payMethod = "efectivo", myLat = DEFAULT.lat, myLng = DEFAULT.lng, destLat = null, destLng = null, routeKm = 0, map, routeLine = null, pickupMarker = null, destinationMarker = null;
+        let pendingPens = [], pickupCustom = false, stops = [], payMethod = "efectivo", myLat = DEFAULT.lat, myLng = DEFAULT.lng, destLat = null, destLng = null, routeKm = 0, map, routeLine = null, pickupMarker = null, destinationMarker = null;
         let mode = "pick", rideCancelled = false, arrivedNotified = false, ratingShown = false, drivers = new Map(), selectedDriver = null, rideId = null, unsubscribeRide = null, unsubscribeDrivers = null, requestBusy = false, lastRouteAt = 0;
 
         map = L.map("map", { zoomControl: false }).setView([myLat, myLng], 14);
@@ -330,7 +334,7 @@
         const dKm = d => d.por_liberar && d.disponible === false && Number.isFinite(d.libre_lat) ? distanceKm(myLat, myLng, d.libre_lat, d.libre_lng) : distanceKm(myLat, myLng, d.lat, d.lng);
         const isFree = d => d.online === true && d.fresh && Number.isFinite(d.lat) && Number.isFinite(d.lng) && (d.disponible !== false || (d.por_liberar === true && Number.isFinite(d.libre_lat) && distanceKm(myLat, myLng, d.libre_lat, d.libre_lng) <= 2));
         function availableDrivers() { return [...drivers.values()].filter(d => isFree(d) && (payMethod !== "transferencia" || d.tiene_cuenta)).sort((a, b) => dKm(a) - dKm(b)) }
-        function setButton() { refreshPayBox(); const auto = mode === "auto", has = auto ? availableDrivers().length > 0 : !!selectedDriver, valid = destLat !== null && has && !requestBusy && !(payMethod === "transferencia" && !auto && selectedDriver && !selectedDriver.tiene_cuenta); $("request-ride").disabled = !valid; $("request-ride").textContent = requestBusy ? "ENVIANDO…" : !destLat ? "SELECCIONA UN DESTINO" : !has ? (auto ? "SIN CONDUCTORES DISPONIBLES" : "ELIGE UN CONDUCTOR") : `SOLICITAR VIAJE${auto ? " AL MÁS CERCANO" : ""} · $${fareTotal()}` }
+        function setButton() { refreshPayBox(); const auto = mode === "auto", has = auto ? availableDrivers().length > 0 : !!selectedDriver, valid = destLat !== null && has && !requestBusy && !pendingPens.length && !(payMethod === "transferencia" && !auto && selectedDriver && !selectedDriver.tiene_cuenta); $("request-ride").disabled = !valid; $("request-ride").textContent = pendingPens.length ? "PENALIZACIÓN PENDIENTE" : requestBusy ? "ENVIANDO…" : !destLat ? "SELECCIONA UN DESTINO" : !has ? (auto ? "SIN CONDUCTORES DISPONIBLES" : "ELIGE UN CONDUCTOR") : `SOLICITAR VIAJE${auto ? " AL MÁS CERCANO" : ""} · $${fareTotal()}` }
         function clearRoute() { if (routeLine) { map.removeLayer(routeLine); routeLine = null } }
         async function routeBetween(aLat, aLng, bLat, bLng) {
             const url = `https://router.project-osrm.org/route/v1/driving/${aLng},${aLat};${stopPts().map(s => s.lng + "," + s.lat + ";").join("")}${bLng},${bLat}?overview=full&geometries=geojson`;
@@ -401,7 +405,7 @@
                 if (mode === "auto") { const next = availableDrivers().find(d => !tried.has(d.id)); if (next) return sendRide(next, name, phone, tried); throw Error("No hay conductores disponibles en este momento.") }
                 throw Error("El conductor ya no está disponible. Elige otro.");
             }
-            const origen = pickupCustom ? $("pickup").value.trim() : await reverseLabel(myLat, myLng); const ref = await addDoc(collection(db, "viajes"), { cliente: name, telefono: phone, destino: $("destination").value.trim(), km: Number(routeKm.toFixed(2)), tarifa_final: fareTotal(), lat: myLat, lng: myLng, origen, paradas: stopPts().map(({ lat, lng, label }) => ({ lat, lng, label: label || "" })), tarifa_paradas: stopFee(), metodo_pago: payMethod, dest_lat: destLat, dest_lng: destLng, chofer_solicitado: driver.id, chofer_nombre: driver.nombre || "Conductor", modo_asignacion: mode === "auto" ? "mas_cercano" : "elegido", estado: "solicitado_chofer", fecha: serverTimestamp() });
+            const origen = pickupCustom ? $("pickup").value.trim() : await reverseLabel(myLat, myLng); const ref = await addDoc(collection(db, "viajes"), { cliente: name, telefono: phone, device: deviceId, destino: $("destination").value.trim(), km: Number(routeKm.toFixed(2)), tarifa_final: fareTotal(), lat: myLat, lng: myLng, origen, paradas: stopPts().map(({ lat, lng, label }) => ({ lat, lng, label: label || "" })), tarifa_paradas: stopFee(), metodo_pago: payMethod, dest_lat: destLat, dest_lng: destLng, chofer_solicitado: driver.id, chofer_nombre: driver.nombre || "Conductor", modo_asignacion: mode === "auto" ? "mas_cercano" : "elegido", estado: "solicitado_chofer", fecha: serverTimestamp() });
             store.set("vipdrive_active_ride", ref.id); trackRide(ref.id, driver, name, phone, tried, { fare: fareTotal(), km: routeKm });
         }
         function trackRide(id, driver, name, phone, tried, info) {
@@ -409,7 +413,7 @@
             rideId = id; store.set("vipdrive_last_ride", rideId); selectedDriver = driver; $("normal-screen").classList.add("hidden"); $("waiting-screen").classList.remove("hidden"); $("waiting-driver").textContent = driver.nombre || "Conductor"; $("waiting-fare").textContent = "$" + info.fare; $("waiting-distance").textContent = Number(info.km || 0).toFixed(1) + " km"; $("waiting-status").textContent = "Notificando al conductor…";
             const lost = msg => { chatOff(); store.set("vipdrive_active_ride", ""); $("waiting-status").textContent = msg; $("cancel-ride").textContent = "VOLVER A SOLICITAR"; $("cancel-ride").onclick = backToStart };
             unsubscribeRide = onSnapshot(doc(db, "viajes", rideId), snap => {
-                if (rideCancelled || !snap.exists() || snap.id !== rideId) return; const v = snap.data();
+                if (rideCancelled || !snap.exists() || snap.id !== rideId) return; const v = snap.data(); curRide = v;
                 if (v.estado === "aceptado") { const dd = drivers.get(driver.id) || driver; waitFrom = v.chofer_llego && !v.viaje_iniciado && v.llegada_ms ? v.llegada_ms : 0; waitFeeFinal = Number(v.tarifa_espera || 0); const totalDue = Number(v.tarifa_final || 0) + waitFeeFinal; $("waiting-fare").textContent = "$" + totalDue; $("waiting-status").textContent = v.en_cola ? "⏳ Tu conductor está terminando un viaje cerca de ti y irá por ti en unos minutos." : v.viaje_iniciado ? (v.paradas?.length && (v.parada_actual || 0) < v.paradas.length ? `🛣️ Viaje en curso · próxima parada ${(v.parada_actual || 0) + 1} de ${v.paradas.length}.` : "🛣️ Viaje en curso hacia tu destino.") : v.chofer_llego ? "🚗 ¡Tu conductor llegó! Te está esperando." : "¡Viaje aceptado! El conductor va hacia tu ubicación."; if (v.chofer_llego && !arrivedNotified) { arrivedNotified = true; notifyArrival() } showWaitPay(driver, totalDue); chatOn(driver); if (Number.isFinite(dd.lat)) { $("open-driver-route").href = `https://www.google.com/maps/search/?api=1&query=${dd.lat},${dd.lng}`; $("open-driver-route").classList.remove("hidden") } }
                 else if (v.estado === "rechazado" || v.estado === "cancelado_chofer") {
                     const next = mode === "auto" ? availableDrivers().find(d => !tried.has(d.id)) : null;
@@ -421,16 +425,16 @@
             });
         }
         $("request-ride").onclick = async () => {
-            if (!destLat || requestBusy || rideId || (mode === "pick" && !selectedDriver)) return;
+            if (!destLat || requestBusy || rideId || pendingPens.length || (mode === "pick" && !selectedDriver)) return;
             const name = $("passenger-name").value.trim(), phone = $("passenger-phone").value.trim();
             if (!name || !phone) { setStatus("Escribe tu nombre y teléfono para solicitar el viaje."); return }
             if (!/^[+0-9\s()-]{8,20}$/.test(phone)) { setStatus("Revisa el número de WhatsApp."); return }
             requestBusy = true; rideCancelled = false; setButton();
-            try { const act = await activeRideFor(phone); if (act) { requestBusy = false; setButton(); setStatus("Ya tienes un viaje en curso. Lo retomamos aquí."); return resumeFrom(act) } const first = mode === "auto" ? availableDrivers()[0] : selectedDriver; if (!first) throw Error("No hay conductores disponibles en este momento."); await sendRide(first, name, phone, new Set()) }
+            try { const pens = await penaltiesFor(phone); if (pens.length) { pendingPens = pens; paintPen(); requestBusy = false; setButton(); setStatus("Tienes una penalización pendiente. Págala al administrador para pedir otro viaje."); return } const act = await activeRideFor(phone); if (act) { requestBusy = false; setButton(); setStatus("Ya tienes un viaje en curso. Lo retomamos aquí."); return resumeFrom(act) } const first = mode === "auto" ? availableDrivers()[0] : selectedDriver; if (!first) throw Error("No hay conductores disponibles en este momento."); await sendRide(first, name, phone, new Set()) }
             catch (e) { setStatus(e.message || "No se pudo enviar la solicitud. Intenta de nuevo."); requestBusy = false; setButton() }
         };
         const cancelLabel = $("cancel-ride").textContent.trim();
-        const cancelRideHandler = $("cancel-ride").onclick = async () => { if (!rideId) return; if (!confirm("¿Seguro que deseas cancelar la solicitud?")) return; rideCancelled = true; try { await updateDoc(doc(db, "viajes", rideId), { estado: "cancelado_cliente", fecha_cancel: serverTimestamp() }); $("waiting-status").textContent = "Solicitud cancelada."; store.set("vipdrive_active_ride", ""); $("cancel-ride").textContent = "VOLVER AL INICIO"; $("cancel-ride").onclick = () => location.reload(); if (unsubscribeRide) unsubscribeRide(); } catch { rideCancelled = false; alert("No se pudo cancelar. Comprueba tu conexión.") } };
+        const cancelRideHandler = $("cancel-ride").onclick = async () => { if (!rideId) return; const penal = penaltyApplies(); if (!confirm(penal ? `⚠ Tu conductor ya está en camino.\n\nSi cancelas ahora se te aplicará una penalización de $${PEN}, que deberás pagar al administrador para volver a pedir viajes.\n\n¿Seguro que quieres cancelar?` : "¿Seguro que deseas cancelar la solicitud?")) return; rideCancelled = true; try { await updateDoc(doc(db, "viajes", rideId), { estado: "cancelado_cliente", fecha_cancel: serverTimestamp(), ...(penal ? { penalizado: true, motivo: "cancelacion_tardia" } : {}) }); if (penal) await addDoc(collection(db, "penalizaciones"), { device: deviceId, telefono: curRide?.telefono || $("passenger-phone").value.trim(), cliente: curRide?.cliente || "", monto: PEN, motivo: "cancelacion_tardia", viaje: rideId, chofer: curRide?.chofer_solicitado || "", estado: "pendiente", creado: serverTimestamp() }); $("waiting-status").textContent = penal ? `Solicitud cancelada. Se aplicó una penalización de $${PEN}: págala al administrador para pedir otro viaje.` : "Solicitud cancelada."; store.set("vipdrive_active_ride", ""); $("cancel-ride").textContent = "VOLVER AL INICIO"; $("cancel-ride").onclick = () => location.reload(); if (unsubscribeRide) unsubscribeRide(); } catch { rideCancelled = false; alert("No se pudo cancelar. Comprueba tu conexión.") } };
         // Sugerencias de destino (Photon/OpenStreetMap, gratuito), llegada del conductor y calificación
         const phCache = new Map();
         async function photon(q, signal) {
@@ -612,9 +616,35 @@
         let waitFrom = 0, waitFeeFinal = 0; const waitFee = ms => 3 * Math.ceil(Math.max(0, ms - 180000) / 60000), mmss = s => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
         setInterval(() => {
             const el = $("wait-info"); if (!rideId) return el.classList.add("hidden");
-            if (waitFrom) { const ms = Date.now() - waitFrom; el.textContent = ms < 180000 ? `⏱ Espera gratis: quedan ${mmss(Math.ceil((180000 - ms) / 1000))}. Después, $3 por minuto.` : `⏱ Tiempo de espera extra: +$${waitFee(ms)} ($3 por minuto)`; el.classList.remove("hidden") }
+            if (waitFrom) { const ms = Date.now() - waitFrom; el.textContent = ms < 180000 ? `⏱ Espera gratis: quedan ${mmss(Math.ceil((180000 - ms) / 1000))}. Después, $3 por minuto.` : `⏱ Tiempo de espera extra: +$${waitFee(ms)} ($3 por minuto). Pasados 5 min, el conductor puede cancelar y se te aplicará una penalización de $${PEN}.`; el.classList.remove("hidden") }
             else if (waitFeeFinal > 0) { el.textContent = `Cargo por tiempo de espera: $${waitFeeFinal}`; el.classList.remove("hidden") } else el.classList.add("hidden");
         }, 1000);
+        // Penalizaciones: no presentarse al viaje o cancelar tarde = $20 que se paga al administrador
+        const PEN = 20; let curRide = null, penUnsubs = [];
+        let deviceId = store.get("vipdrive_device"); if (!deviceId) { deviceId = crypto.randomUUID?.() || "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); store.set("vipdrive_device", deviceId) }
+        function penaltyApplies() {
+            const v = curRide; if (!v || v.estado !== "aceptado" || v.en_cola || v.viaje_iniciado) return false;
+            const acc = v.chofer_acepto?.toMillis?.() || 0; if (!acc || Date.now() - acc < 300000) return false;
+            const dd = drivers.get(v.chofer_solicitado); return !!(v.chofer_llego || (dd && Number.isFinite(v.chofer_lat) && distanceKm(dd.lat, dd.lng, v.chofer_lat, v.chofer_lng) >= 0.1));
+        }
+        async function penaltiesFor(phone) {
+            try {
+                const qs = [query(collection(db, "penalizaciones"), where("device", "==", deviceId), where("estado", "==", "pendiente"))]; if (phone) qs.push(query(collection(db, "penalizaciones"), where("telefono", "==", phone), where("estado", "==", "pendiente")));
+                const rs = await Promise.all(qs.map(q => getDocs(q))); return [...new Map(rs.flatMap(r => r.docs).map(d => [d.id, { id: d.id, ...d.data() }])).values()];
+            } catch (e) { console.error(e); return [] }
+        }
+        function paintPen() {
+            const n = pendingPens.length; $("pen-banner").classList.toggle("hidden", !n); if (!n) return;
+            const total = pendingPens.reduce((s, p) => s + Number(p.monto || 0), 0), why = { no_show: "no presentarte al viaje", cancelacion_tardia: "cancelar con el conductor en camino" };
+            $("pen-text").textContent = `Tienes ${n > 1 ? n + " penalizaciones pendientes" : "una penalización pendiente"} por $${total} (${[...new Set(pendingPens.map(p => why[p.motivo] || "penalización"))].join(" y ")}). Págala al administrador para poder pedir otro viaje.`;
+        }
+        function watchPenalties() {
+            penUnsubs.forEach(u => u()); penUnsubs = []; const sets = new Map(), apply = () => { pendingPens = [...new Map([...sets.values()].flat().map(p => [p.id, p])).values()]; paintPen(); setButton() };
+            const sub = (key, field, val) => penUnsubs.push(onSnapshot(query(collection(db, "penalizaciones"), where(field, "==", val), where("estado", "==", "pendiente")), snap => { sets.set(key, snap.docs.map(d => ({ id: d.id, ...d.data() }))); apply() }, e => console.error(e)));
+            sub("d", "device", deviceId); const ph = ($("passenger-phone").value || store.get("vipdrive_phone")).trim(); if (/^[+0-9\s()-]{8,20}$/.test(ph)) sub("p", "telefono", ph);
+        }
+        $("passenger-phone").addEventListener("change", watchPenalties);
+        $("pen-help").onclick = () => { supShow(); if (!ticketId) { $("sup-type").value = "Problema con el cobro o pago"; if (!$("sup-text").value) $("sup-text").value = "Quiero pagar mi penalización." } };
         // Volver a solicitar: regresa a la pantalla de inicio conservando destino, paradas, recogida y pago del viaje anterior
         function backToStart() {
             chatOff(); store.set("vipdrive_active_ride", ""); unsubscribeRide?.(); unsubscribeRide = null; rideId = null; rideCancelled = false; requestBusy = false; selectedDriver = null; arrivedNotified = false; $("selected-driver-label").textContent = "";
@@ -658,6 +688,7 @@
         $("passenger-name").value = store.get("vipdrive_name"); $("passenger-phone").value = store.get("vipdrive_phone");
         $("passenger-name").addEventListener("input", e => store.set("vipdrive_name", e.target.value.trim()));
         $("passenger-phone").addEventListener("input", e => store.set("vipdrive_phone", e.target.value.trim()));
+        watchPenalties();
         resumeRide();
         updateLocation();
     </script>
