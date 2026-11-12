@@ -245,6 +245,7 @@
                     </div>
                     <p id="waiting-status" class="text-xs text-[#8A6A00] font-bold mt-4">Notificando al conductor…</p>
                 </div>
+                <p id="wait-info" class="hidden text-sm font-bold mt-3 rounded-2xl bg-[#FBF6E6] p-3 text-center"></p>
                 <button id="chat-open" type="button" class="hidden primary mt-3">💬 Chat con tu conductor<span id="chat-badge" class="vd-dot hidden"></span></button>
                 <div id="wait-pay" class="hidden mt-3 rounded-2xl bg-[#FBF6E6] p-3 text-sm"></div>
                 <div id="rating-box" class="hidden mt-4 text-center">
@@ -409,14 +410,14 @@
             const lost = msg => { chatOff(); store.set("vipdrive_active_ride", ""); $("waiting-status").textContent = msg; $("cancel-ride").textContent = "VOLVER A SOLICITAR"; $("cancel-ride").onclick = backToStart };
             unsubscribeRide = onSnapshot(doc(db, "viajes", rideId), snap => {
                 if (rideCancelled || !snap.exists() || snap.id !== rideId) return; const v = snap.data();
-                if (v.estado === "aceptado") { const dd = drivers.get(driver.id) || driver; $("waiting-status").textContent = v.en_cola ? "⏳ Tu conductor está terminando un viaje cerca de ti y irá por ti en unos minutos." : v.viaje_iniciado ? (v.paradas?.length && (v.parada_actual || 0) < v.paradas.length ? `🛣️ Viaje en curso · próxima parada ${(v.parada_actual || 0) + 1} de ${v.paradas.length}.` : "🛣️ Viaje en curso hacia tu destino.") : v.chofer_llego ? "🚗 ¡Tu conductor llegó! Te está esperando." : "¡Viaje aceptado! El conductor va hacia tu ubicación."; if (v.chofer_llego && !arrivedNotified) { arrivedNotified = true; notifyArrival() } showWaitPay(driver); chatOn(driver); if (Number.isFinite(dd.lat)) { $("open-driver-route").href = `https://www.google.com/maps/search/?api=1&query=${dd.lat},${dd.lng}`; $("open-driver-route").classList.remove("hidden") } }
+                if (v.estado === "aceptado") { const dd = drivers.get(driver.id) || driver; waitFrom = v.chofer_llego && !v.viaje_iniciado && v.llegada_ms ? v.llegada_ms : 0; waitFeeFinal = Number(v.tarifa_espera || 0); const totalDue = Number(v.tarifa_final || 0) + waitFeeFinal; $("waiting-fare").textContent = "$" + totalDue; $("waiting-status").textContent = v.en_cola ? "⏳ Tu conductor está terminando un viaje cerca de ti y irá por ti en unos minutos." : v.viaje_iniciado ? (v.paradas?.length && (v.parada_actual || 0) < v.paradas.length ? `🛣️ Viaje en curso · próxima parada ${(v.parada_actual || 0) + 1} de ${v.paradas.length}.` : "🛣️ Viaje en curso hacia tu destino.") : v.chofer_llego ? "🚗 ¡Tu conductor llegó! Te está esperando." : "¡Viaje aceptado! El conductor va hacia tu ubicación."; if (v.chofer_llego && !arrivedNotified) { arrivedNotified = true; notifyArrival() } showWaitPay(driver, totalDue); chatOn(driver); if (Number.isFinite(dd.lat)) { $("open-driver-route").href = `https://www.google.com/maps/search/?api=1&query=${dd.lat},${dd.lng}`; $("open-driver-route").classList.remove("hidden") } }
                 else if (v.estado === "rechazado" || v.estado === "cancelado_chofer") {
                     const next = mode === "auto" ? availableDrivers().find(d => !tried.has(d.id)) : null;
                     if (next) { $("waiting-status").textContent = "Buscando al siguiente conductor cercano…"; sendRide(next, name, phone, tried).catch(() => lost("Ningún conductor cercano pudo tomar tu viaje. Puedes solicitarlo de nuevo.")) }
                     else lost(mode === "auto" ? "Ningún conductor cercano pudo tomar tu viaje. Puedes solicitarlo de nuevo." : "El conductor no pudo completar la solicitud. Puedes solicitar otro viaje.");
                 }
                 else if (v.estado === "cancelado_cliente") { $("waiting-status").textContent = "Solicitud cancelada."; chatOff(); store.set("vipdrive_active_ride", ""); $("cancel-ride").textContent = "VOLVER AL INICIO"; $("cancel-ride").onclick = () => location.reload() }
-                else if (v.estado === "finalizado") showRating(snap.id, driver)
+                else if (v.estado === "finalizado") showRating(snap.id, driver, v)
             });
         }
         $("request-ride").onclick = async () => {
@@ -470,9 +471,9 @@
             $("waiting-status").className = "text-base text-green-700 font-black mt-4"; try { navigator.vibrate?.([300, 150, 300]) } catch { }
             try { new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg").play().catch(() => { }) } catch { }
         }
-        function showRating(id, driver) {
+        function showRating(id, driver, v) {
             if (ratingShown) return; ratingShown = true; chatOff(); let stars = 0;
-            $("waiting-status").textContent = "Viaje finalizado. ¡Gracias por viajar con VIPDRIVE!"; $("cancel-ride").classList.add("hidden"); $("open-driver-route").classList.add("hidden");
+            $("waiting-status").textContent = "Viaje finalizado." + (v?.monto_cobrado ? ` Total: $${v.monto_cobrado}.` : "") + " ¡Gracias por viajar con VIPDRIVE!"; $("cancel-ride").classList.add("hidden"); $("open-driver-route").classList.add("hidden");
             $("rate-title").textContent = `¿Cómo estuvo tu viaje con ${(driver.nombre || "tu conductor").split(" ")[0]}?`; $("rating-box").classList.remove("hidden");
             const box = $("stars"), paint = () => [...box.children].forEach((b, i) => { b.style.color = i < stars ? "#f5b301" : "#d1d5db"; b.setAttribute("aria-checked", i + 1 === stars) });
             box.replaceChildren(...[1, 2, 3, 4, 5].map(n => { const b = document.createElement("button"); b.type = "button"; b.textContent = "★"; b.className = "text-4xl leading-none px-1"; b.setAttribute("role", "radio"); b.setAttribute("aria-label", n + (n === 1 ? " estrella" : " estrellas")); b.onclick = () => { stars = n; paint(); $("rate-send").disabled = false }; return b })); paint();
@@ -525,7 +526,7 @@
         }
         function setPay(m) { payMethod = m; $("pay-cash").classList.toggle("on", m === "efectivo"); $("pay-transfer").classList.toggle("on", m === "transferencia"); $("pay-cash").setAttribute("aria-pressed", m === "efectivo"); $("pay-transfer").setAttribute("aria-pressed", m === "transferencia"); renderDrivers() }
         $("pay-cash").onclick = () => setPay("efectivo"); $("pay-transfer").onclick = () => setPay("transferencia");
-        function showWaitPay(driver) { if (payMethod === "transferencia") accountFor(driver.id).then(c => c && acctBox($("wait-pay"), driver.nombre, c, fareTotal())).catch(() => { }) }
+        function showWaitPay(driver, amount) { if (payMethod === "transferencia") accountFor(driver.id).then(c => c && acctBox($("wait-pay"), driver.nombre, c, amount)).catch(() => { }) }
         // Soporte
         let ticketId = store.get("vipdrive_ticket"), tkUns = null, msgUns = null, tk = null;
         const supOpen = () => !$("sup").classList.contains("hidden");
@@ -607,6 +608,13 @@
             const id = store.get("vipdrive_active_ride"); if (!id) return;
             try { const s = await getDoc(doc(db, "viajes", id)); if (!s.exists()) { store.set("vipdrive_active_ride", ""); return } await resumeFrom(s) } catch (e) { console.error(e) }
         }
+        // Tiempo de espera del conductor: 3 min gratis y luego $3 por minuto
+        let waitFrom = 0, waitFeeFinal = 0; const waitFee = ms => 3 * Math.ceil(Math.max(0, ms - 180000) / 60000), mmss = s => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+        setInterval(() => {
+            const el = $("wait-info"); if (!rideId) return el.classList.add("hidden");
+            if (waitFrom) { const ms = Date.now() - waitFrom; el.textContent = ms < 180000 ? `⏱ Espera gratis: quedan ${mmss(Math.ceil((180000 - ms) / 1000))}. Después, $3 por minuto.` : `⏱ Tiempo de espera extra: +$${waitFee(ms)} ($3 por minuto)`; el.classList.remove("hidden") }
+            else if (waitFeeFinal > 0) { el.textContent = `Cargo por tiempo de espera: $${waitFeeFinal}`; el.classList.remove("hidden") } else el.classList.add("hidden");
+        }, 1000);
         // Volver a solicitar: regresa a la pantalla de inicio conservando destino, paradas, recogida y pago del viaje anterior
         function backToStart() {
             chatOff(); store.set("vipdrive_active_ride", ""); unsubscribeRide?.(); unsubscribeRide = null; rideId = null; rideCancelled = false; requestBusy = false; selectedDriver = null; arrivedNotified = false; $("selected-driver-label").textContent = "";
