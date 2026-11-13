@@ -189,12 +189,26 @@
         <div class="absolute inset-0 bg-black/85"></div>
         <div class="absolute inset-0 flex items-center justify-center p-4">
             <div class="vd-sheet w-full max-w-md rounded-3xl border-2 border-[#D4AF37] bg-[#0B0B0D] p-5 text-center">
+                <div id="cobro-main">
                 <p id="cobro-title" class="text-xs font-black tracking-widest text-[#D4AF37]">MONTO A COBRAR</p>
                 <p id="cobro-total" class="text-6xl font-black text-[#D4AF37] mt-2">$0</p>
                 <p id="cobro-method" class="mt-2 text-lg font-bold"></p>
                 <div id="cobro-detail" class="mt-3 rounded-2xl bg-white/5 p-3 text-sm space-y-1"></div>
                 <button id="cobro-ok" type="button" class="vd-req-accept w-full mt-5"></button>
+                <button id="cobro-nopago" type="button" class="mx-auto mt-3 block rounded-full border border-red-400/60 px-4 py-2 text-xs font-bold text-red-300">❌ El pasajero no pagó</button>
                 <button id="cobro-back" type="button" class="w-full mt-2 py-3 text-sm text-gray-400 underline">Volver</button>
+                </div>
+                <div id="nopago-box" class="hidden text-left">
+                    <p class="text-xs font-black tracking-widest text-red-300">EL PASAJERO NO PAGÓ</p>
+                    <p class="text-sm muted mt-1">Se enviará un reporte a soporte con los datos del pasajero para decidir si se le aplica una penalización.</p>
+                    <label class="block text-xs muted mt-3" for="np-monto">Monto recibido (MXN)</label>
+                    <input id="np-monto" type="number" inputmode="decimal" min="0" step="1" value="0" class="mt-1 w-full rounded-xl bg-white/5 border border-white/10 p-3 text-base outline-none focus:border-[#D4AF37]">
+                    <label class="block text-xs muted mt-3" for="np-motivo">Motivo por el que se negó a pagar</label>
+                    <textarea id="np-motivo" rows="3" maxlength="400" class="mt-1 w-full rounded-xl bg-white/5 border border-white/10 p-3 text-base outline-none focus:border-[#D4AF37]" placeholder="Describe lo que pasó"></textarea>
+                    <p id="np-err" role="alert" class="text-xs text-red-300 mt-2 min-h-[1rem]"></p>
+                    <button id="np-ok" type="button" class="vd-req-accept w-full mt-2">FINALIZAR VIAJE</button>
+                    <button id="np-back" type="button" class="w-full mt-2 py-3 text-sm text-gray-400 underline">Volver</button>
+                </div>
             </div>
         </div>
     </div>
@@ -470,8 +484,9 @@
             const arriving = !ride.chofer_llego;
             try {
                 const now = Date.now(), waitMs = arriving ? 0 : Math.max(0, now - (ride.llegada_ms || now)), fee = waitFee(waitMs);
-                const extra = arriving ? { chofer_llego: true, llegada: serverTimestamp(), llegada_ms: now } : { viaje_iniciado: true, inicio: serverTimestamp(), espera_seg: Math.round(waitMs / 1000), tarifa_espera: fee };
-                const local = arriving ? { chofer_llego: true, llegada_ms: now } : { viaje_iniciado: true, espera_seg: Math.round(waitMs / 1000), tarifa_espera: fee };
+                const pp = curPos(), dm = pickupDist(), arrPos = pp ? { llegada_lat: pp.lat, llegada_lng: pp.lng, llegada_dist_m: dm === null ? null : Math.round(dm) } : {};
+                const extra = arriving ? { chofer_llego: true, llegada: serverTimestamp(), llegada_ms: now, ...arrPos } : { viaje_iniciado: true, inicio: serverTimestamp(), espera_seg: Math.round(waitMs / 1000), tarifa_espera: fee };
+                const local = arriving ? { chofer_llego: true, llegada_ms: now, ...arrPos } : { viaje_iniciado: true, espera_seg: Math.round(waitMs / 1000), tarifa_espera: fee };
                 await updateDoc(doc(db, "viajes", ride.id), extra);
                 ride = { ...ride, ...local }; syncArrival(); navigator.vibrate?.(100);
             } catch (e) { console.error(e); $("arrived").disabled = false; alert(arriving ? "No se pudo avisar al pasajero. Revisa tu conexión." : "No se pudo iniciar el viaje. Revisa tu conexión.") }
@@ -494,9 +509,34 @@
             if (!ride || ride.estado !== "aceptado") return; const tr = ride.metodo_pago === "transferencia", fee = Number(ride.tarifa_espera || 0);
             $("cobro-total").textContent = money(rideTotal(ride)); $("cobro-method").textContent = tr ? "🏦 Pago por transferencia" : "💵 Pago en efectivo";
             $("cobro-detail").replaceChildren(...[["Tarifa del viaje", money(Number(ride.tarifa_final || 0))], ...(fee ? [[`Espera extra (${Math.round(fee / 3)} min)`, "+" + money(fee)]] : []), ["Pasajero", ride.cliente || "—"]].map(([k, v]) => { const el = document.createElement("div"), a = document.createElement("span"), b = document.createElement("b"); el.className = "flex justify-between gap-3"; a.className = "muted"; a.textContent = k; b.textContent = v; el.append(a, b); return el }));
-            $("cobro-ok").textContent = tr ? "CONFIRMAR TRANSFERENCIA" : "RECIBÍ EFECTIVO"; $("cobro-ok").disabled = false; $("cobro").classList.remove("hidden");
+            $("cobro-ok").textContent = tr ? "CONFIRMAR TRANSFERENCIA" : "RECIBÍ EFECTIVO"; $("cobro-ok").disabled = false; $("cobro-main").classList.remove("hidden"); $("nopago-box").classList.add("hidden"); $("cobro").classList.remove("hidden");
         }
         $("finish").onclick = openCobro; $("cobro-back").onclick = () => $("cobro").classList.add("hidden");
+        // Evidencia del viaje (se guarda en multas y reportes para que el admin pueda verificarlos)
+        const curPos = () => { const p = marker?.getLatLng?.(); return p ? { lat: p.lat, lng: p.lng } : null };
+        function buildEv(r, extra = {}) {
+            const p = curPos(), d = p && r.lat != null ? Math.round(km(p.lat, p.lng, r.lat, r.lng) * 1000) : null, ms = v => v?.toMillis?.() || null;
+            return { quien: "chofer", chofer_id: driverId, chofer_nombre: driverData?.nombre || "", vehiculo: [driverData?.auto, driverData?.placas].filter(Boolean).join(" · "), viaje: r.id, cliente: r.cliente || "", telefono: r.telefono || "", origen: r.origen || "", destino: r.destino || "", tarifa: rideTotal(r), metodo_pago: r.metodo_pago || "efectivo",
+                pickup: r.lat != null ? { lat: r.lat, lng: r.lng } : null, t_acepto: ms(r.chofer_acepto), t_llegada: r.llegada_ms || null, t_cancel: Date.now(), acept_pos: r.chofer_lat != null ? { lat: r.chofer_lat, lng: r.chofer_lng } : null,
+                llegada_pos: r.llegada_lat != null ? { lat: r.llegada_lat, lng: r.llegada_lng, d: r.llegada_dist_m ?? null } : null, cancel_pos: p ? { ...p, d } : null, ...extra };
+        }
+        $("cobro-nopago").onclick = () => { $("cobro-main").classList.add("hidden"); $("nopago-box").classList.remove("hidden"); $("np-monto").value = 0; $("np-motivo").value = ""; $("np-err").textContent = "" };
+        $("np-back").onclick = () => { $("nopago-box").classList.add("hidden"); $("cobro-main").classList.remove("hidden") };
+        $("np-ok").onclick = async () => {
+            if (!ride) return; const r = ride, due = rideTotal(r), rec = Number($("np-monto").value), motivo = $("np-motivo").value.trim(), err = $("np-err");
+            if (!Number.isFinite(rec) || rec < 0) { err.textContent = "Escribe el monto recibido (0 si no pagó nada)."; return }
+            if (rec > due) { err.textContent = "El monto recibido no puede ser mayor al total del viaje."; return }
+            if (motivo.length < 5) { err.textContent = "Escribe el motivo por el que se negó a pagar."; return }
+            $("np-ok").disabled = true; err.textContent = "";
+            try {
+                const adeudo = due - rec, ev = buildEv(r, { monto_recibido: rec, motivo_no_pago: motivo, adeudo, quien: "chofer" }), tid = "np_" + r.id;
+                const texto = `🚨 REPORTE DE NO PAGO\nChofer: ${driverData?.nombre || ""} (usuario ${driverId}) · ${ev.vehiculo}\nPasajero: ${r.cliente || "—"} · Tel: ${r.telefono || "—"}\nViaje: ${r.id}\nRecogida: ${r.origen || "—"}\nDestino: ${r.destino || "—"}\nTotal del viaje: $${due} (${ev.metodo_pago})\nMonto recibido: $${rec} · Adeudo: $${adeudo}\nMotivo: ${motivo}`;
+                await setDoc(doc(db, "soporte", tid), { nombre: r.cliente || "Pasajero", telefono: r.telefono || "", tipo: "Reporte de chofer: no pago", origen: "chofer", viaje: r.id, device: r.device || "", chofer: driverId, adeudo, estado: "abierto", creado: serverTimestamp(), actualizado: serverTimestamp(), ultimo: `Chofer ${driverData?.nombre || driverId} reporta que el pasajero no pagó ($${adeudo})`, sin_leer_admin: true, sin_leer_usuario: false, ev });
+                await addDoc(collection(db, "soporte", tid, "mensajes"), { de: "chofer", texto, ts: serverTimestamp() });
+                await updateDoc(doc(db, "viajes", r.id), { estado: "finalizado", fin: serverTimestamp(), monto_cobrado: rec, monto_debido: due, monto_recibido: rec, adeudo, pago_confirmado: false, pago_incompleto: true, motivo_no_pago: motivo, pago_metodo: r.metodo_pago === "transferencia" ? "transferencia" : "efectivo" });
+                $("cobro").classList.add("hidden");
+            } catch (e) { console.error(e); $("np-ok").disabled = false; err.textContent = "No se pudo enviar el reporte. Revisa tu conexión e inténtalo de nuevo." }
+        };
         $("cobro-ok").onclick = async () => {
             if (!ride) return; $("cobro-ok").disabled = true;
             try { await updateDoc(doc(db, "viajes", ride.id), { estado: "finalizado", fin: serverTimestamp(), monto_cobrado: rideTotal(ride), pago_confirmado: true, pago_metodo: ride.metodo_pago === "transferencia" ? "transferencia" : "efectivo" }); $("cobro").classList.add("hidden") }
@@ -506,7 +546,7 @@
         $("cancel-active").onclick = async () => { if (!ride) return; const r = ride, noShow = r.estado === "aceptado" && r.chofer_llego && !r.viaje_iniciado && r.llegada_ms && Date.now() - r.llegada_ms >= 300000;
             if (!confirm(noShow ? "El pasajero no se presentó después de 5 minutos.\n\nAl cancelar se le aplicará una penalización de $20 y no podrá pedir otro viaje hasta pagarla al administrador.\n\n¿Cancelar el viaje?" : "¿Seguro que deseas cancelar este viaje?")) return;
             try {
-                if (noShow) await setDoc(doc(db, "penalizaciones", "pen_" + r.id), { device: r.device || "", telefono: r.telefono || "", cliente: r.cliente || "", monto: 20, motivo: "no_show", viaje: r.id, chofer: driverId, estado: "pendiente", creado: serverTimestamp() });
+                if (noShow) await setDoc(doc(db, "penalizaciones", "pen_" + r.id), { device: r.device || "", telefono: r.telefono || "", cliente: r.cliente || "", monto: 20, motivo: "no_show", viaje: r.id, chofer: driverId, estado: "pendiente", creado: serverTimestamp(), ev: buildEv(r, { quien: "chofer" }) });
                 await updateDoc(doc(db, "viajes", r.id), { estado: "cancelado_chofer", fecha_cancel: serverTimestamp(), ...(noShow ? { motivo: "pasajero_no_se_presento", penalizado: true } : {}) }); await setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); ride = null; if (queuedRide) { promoteQueued(); return } show("cancelled-card"); $("cancelled-reason").textContent = noShow ? "Se aplicó la penalización de $20 al pasajero." : "Cancelaste el viaje."; if (routeLine) map.removeLayer(routeLine) } catch (e) { console.error(e); alert("No se pudo cancelar el viaje. Revisa tu conexión e inténtalo de nuevo.") } };
         $("dismiss-cancelled").onclick = () => { show(null); if (online) listenRequests() };
         window.addEventListener("beforeunload", () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId) });
