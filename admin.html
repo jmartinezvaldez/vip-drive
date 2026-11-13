@@ -226,7 +226,7 @@
 
         // ---- Soporte (chat con pasajeros)
         let tickets = [], openId = null, msgsUns = null;
-        const tipoIcon = t => /chofer/i.test(t) ? "🚨" : /perdido/i.test(t) ? "🎒" : /cobro|pago/i.test(t) ? "💳" : /queja/i.test(t) ? "⚠️" : "💬";
+        const tipoIcon = t => /conductor/i.test(t) ? "🚘" : /factur/i.test(t) ? "🧾" : /chofer/i.test(t) ? "🚨" : /perdido/i.test(t) ? "🎒" : /cobro|pago/i.test(t) ? "💳" : /queja/i.test(t) ? "⚠️" : "💬";
         function paintTickets() {
             $("sop-list").innerHTML = tickets.length ? tickets.map(t => `<button type="button" data-tk="${esc(t.id)}" class="w-full text-left rounded-2xl bg-black/40 border ${t.sin_leer_admin && t.estado !== "cerrado" ? "border-[#D4AF37]" : "border-white/10"} p-3">
 <div class="flex justify-between gap-2"><b class="text-sm truncate">${tipoIcon(t.tipo)} ${esc(t.tipo)} · ${esc(t.nombre)}</b><span class="text-[10px] rounded-full px-2 py-0.5 ${t.estado === "cerrado" ? "bg-zinc-800 text-gray-400" : "bg-green-700 text-white"}">${t.estado === "cerrado" ? "Cerrado" : "Abierto"}</span></div>
