@@ -289,8 +289,8 @@
         <div class="vd-sheet absolute bottom-0 inset-x-0 max-w-xl mx-auto bg-white rounded-t-[28px] p-4 flex flex-col" style="height:min(82vh,660px);padding-bottom:max(16px,env(safe-area-inset-bottom))">
             <div class="flex justify-between items-center"><h2 id="sup-title" class="text-lg font-extrabold">Soporte VIPDRIVE</h2><button id="sup-close" type="button" class="text-gray-500 px-2" aria-label="Cerrar">✕</button></div>
             <div id="sup-new" class="overflow-y-auto">
-                <p class="text-xs text-gray-500 mt-1">Cuéntanos tu queja, objeto perdido u otro problema. Te respondemos aquí mismo.</p>
-                <select id="sup-type" class="field mt-3" aria-label="Tipo de reporte"><option>Objeto perdido</option><option>Queja del servicio</option><option>Problema con el cobro o pago</option><option>Otro</option></select>
+                <p class="text-xs text-gray-500 mt-1">Elige el motivo y cuéntanos. Te respondemos aquí mismo.</p>
+                <select id="sup-type" class="field mt-3" aria-label="Tipo de reporte"><option>Quiero ser conductor de VIPDRIVE</option><option>Quiero facturar un viaje</option><option>Objeto perdido</option><option>Queja del servicio</option><option>Problema con el cobro o pago</option><option>Otro</option></select>
                 <div class="grid grid-cols-2 gap-2 mt-2"><input id="sup-name" class="field" maxlength="60" placeholder="Tu nombre"><input id="sup-phone" class="field" inputmode="tel" placeholder="Tu WhatsApp"></div>
                 <textarea id="sup-text" rows="4" maxlength="800" class="field mt-2 w-full" placeholder="Describe lo que pasó"></textarea>
                 <button id="sup-create" type="button" class="primary mt-3">ENVIAR REPORTE</button>
@@ -310,6 +310,14 @@
             <div id="chat-msgs" class="flex-1 overflow-y-auto space-y-2 py-3"></div>
             <div class="flex gap-2"><input id="chat-input" class="field" maxlength="300" placeholder="Escribe un mensaje" aria-label="Mensaje"><button id="chat-send" type="button" class="primary" style="width:auto;padding:0 18px">Enviar</button></div>
         </div>
+    </div>
+
+    <div id="lb" class="hidden fixed inset-0 z-[1100] bg-black flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Fotos del conductor">
+        <button id="lb-close" type="button" aria-label="Cerrar" class="absolute right-3 z-10 w-11 h-11 rounded-full bg-white/15 text-white text-xl" style="top:max(12px,env(safe-area-inset-top))">✕</button>
+        <p id="lb-count" class="absolute left-0 right-0 text-center text-white/80 text-sm pointer-events-none" style="top:max(24px,calc(env(safe-area-inset-top) + 12px))"></p>
+        <button id="lb-prev" type="button" aria-label="Foto anterior" class="absolute left-2 z-10 w-12 h-12 rounded-full bg-white/15 text-white text-3xl leading-none" style="top:calc(50% - 24px)">‹</button>
+        <img id="lb-img" alt="Foto del conductor" class="max-w-full max-h-full object-contain select-none" draggable="false">
+        <button id="lb-next" type="button" aria-label="Foto siguiente" class="absolute right-2 z-10 w-12 h-12 rounded-full bg-white/15 text-white text-3xl leading-none" style="top:calc(50% - 24px)">›</button>
     </div>
 
     <script type="module">
@@ -645,7 +653,20 @@
             sub("d", "device", deviceId); const ph = ($("passenger-phone").value || store.get("vipdrive_phone")).trim(); if (/^[+0-9\s()-]{8,20}$/.test(ph)) sub("p", "telefono", ph);
         }
         $("passenger-phone").addEventListener("change", watchPenalties);
-        $("pen-help").onclick = () => { supShow(); if (!ticketId) { $("sup-type").value = "Problema con el cobro o pago"; if (!$("sup-text").value) $("sup-text").value = "Quiero pagar mi penalización." } };
+        $("pen-help").onclick = () => { supShow(); if (!ticketId) { $("sup-type").value = "Problema con el cobro o pago"; $("sup-type").dispatchEvent(new Event("change")); if (!$("sup-text").value) $("sup-text").value = "Quiero pagar mi penalización." } };
+        // Visor de fotos a pantalla completa (flechas, deslizar y X para volver)
+        let lbPhotos = [], lbIdx = 0, lbX = null;
+        function lbShow() { $("lb-img").src = lbPhotos[lbIdx]; $("lb-count").textContent = lbPhotos.length > 1 ? `${lbIdx + 1} / ${lbPhotos.length}` : ""; $("lb-prev").classList.toggle("hidden", lbPhotos.length < 2); $("lb-next").classList.toggle("hidden", lbPhotos.length < 2) }
+        function openLightbox(list, i) { lbPhotos = list; lbIdx = i; lbShow(); $("lb").classList.remove("hidden") }
+        const lbMove = dir => { if (lbPhotos.length < 2) return; lbIdx = (lbIdx + dir + lbPhotos.length) % lbPhotos.length; lbShow() };
+        $("lb-close").onclick = () => $("lb").classList.add("hidden"); $("lb-prev").onclick = () => lbMove(-1); $("lb-next").onclick = () => lbMove(1);
+        $("lb").addEventListener("touchstart", e => { lbX = e.touches[0].clientX }, { passive: true });
+        $("lb").addEventListener("touchend", e => { if (lbX === null) return; const dx = e.changedTouches[0].clientX - lbX; lbX = null; if (Math.abs(dx) > 50) lbMove(dx < 0 ? 1 : -1) });
+        document.addEventListener("keydown", e => { if ($("lb").classList.contains("hidden")) return; if (e.key === "Escape") { $("lb").classList.add("hidden"); e.stopPropagation() } else if (e.key === "ArrowLeft") lbMove(-1); else if (e.key === "ArrowRight") lbMove(1) }, true);
+        // Sugerencias según el motivo de soporte elegido
+        const supHints = { "Quiero ser conductor de VIPDRIVE": "Cuéntanos: nombre completo, auto (marca, modelo y año), placas y si cuentas con licencia vigente.", "Quiero facturar un viaje": "Escribe tu RFC, razón social, régimen fiscal, código postal, correo, uso de CFDI y la fecha y destino del viaje." };
+        $("sup-type").addEventListener("change", () => { $("sup-text").placeholder = supHints[$("sup-type").value] || "Describe lo que pasó" });
+        $("sup-text").placeholder = supHints[$("sup-type").value] || "Describe lo que pasó";
         // Volver a solicitar: regresa a la pantalla de inicio conservando destino, paradas, recogida y pago del viaje anterior
         function backToStart() {
             chatOff(); store.set("vipdrive_active_ride", ""); unsubscribeRide?.(); unsubscribeRide = null; rideId = null; rideCancelled = false; requestBusy = false; selectedDriver = null; arrivedNotified = false; $("selected-driver-label").textContent = "";
@@ -666,8 +687,8 @@
         function paintPhotos(d, ph) {
             const box = $("pf-photos"); box.replaceChildren();
             if (!ph.length) { const e = document.createElement("div"); e.className = "w-full h-48 rounded-2xl bg-[#FBF6E6] grid place-items-center text-6xl"; e.textContent = "🚗"; box.append(e) }
-            ph.forEach(u => { const im = new Image(); im.src = u; im.alt = "Foto de " + (d.nombre || "conductor"); im.className = "snap-center shrink-0 w-full h-56 object-cover rounded-2xl bg-gray-100"; box.append(im) });
-            $("pf-count").textContent = ph.length > 1 ? `Desliza para ver las ${ph.length} fotos` : "";
+            ph.forEach((u, i) => { const im = new Image(); im.src = u; im.alt = "Foto de " + (d.nombre || "conductor"); im.className = "snap-center shrink-0 w-full h-56 object-cover rounded-2xl bg-gray-100 cursor-zoom-in"; im.tabIndex = 0; im.setAttribute("role", "button"); im.onclick = () => openLightbox(ph, i); im.onkeydown = e => { if (e.key === "Enter") openLightbox(ph, i) }; box.append(im) });
+            $("pf-count").textContent = ph.length ? `Toca una foto para verla en pantalla completa${ph.length > 1 ? " · " + ph.length + " fotos" : ""}` : "";
         }
         function openProfile(id) {
             const d = drivers.get(id); if (!d) return; profileId = id; const fk = d.fotosDoc || id; paintPhotos(d, photoCache.get(fk) || photosOf(d));
