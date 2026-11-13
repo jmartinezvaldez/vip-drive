@@ -69,8 +69,10 @@
         <div id="sop-chat" class="hidden bg-zinc-900/80 border border-white/10 rounded-2xl p-3">
             <div class="flex items-start justify-between gap-2"><div><p id="sop-head" class="font-extrabold text-sm"></p><p id="sop-sub" class="text-xs text-gray-400"></p></div>
                 <button id="sop-back" type="button" class="text-xs text-[#E8C766] underline shrink-0">← Volver</button></div>
+            <div id="sop-ev" class="mt-2"></div>
             <div id="sop-msgs" class="mt-3 space-y-2 max-h-[45vh] overflow-y-auto"></div>
             <div class="flex gap-2 mt-3"><input id="sop-input" class="vd-in" placeholder="Responder…" aria-label="Respuesta"><button id="sop-send" type="button" class="shrink-0 rounded-xl bg-[#D4AF37] text-black px-4 font-bold text-sm">Enviar</button></div>
+            <button id="sop-pen" type="button" class="hidden mt-3 w-full rounded-xl border border-red-400/60 py-2 text-sm font-bold text-red-300">⚠ Aplicar penalización al pasajero</button>
             <button id="sop-toggle" type="button" class="mt-2 text-xs text-gray-400 underline"></button>
         </div>
     </section>
@@ -224,7 +226,7 @@
 
         // ---- Soporte (chat con pasajeros)
         let tickets = [], openId = null, msgsUns = null;
-        const tipoIcon = t => /perdido/i.test(t) ? "🎒" : /cobro|pago/i.test(t) ? "💳" : /queja/i.test(t) ? "⚠️" : "💬";
+        const tipoIcon = t => /chofer/i.test(t) ? "🚨" : /perdido/i.test(t) ? "🎒" : /cobro|pago/i.test(t) ? "💳" : /queja/i.test(t) ? "⚠️" : "💬";
         function paintTickets() {
             $("sop-list").innerHTML = tickets.length ? tickets.map(t => `<button type="button" data-tk="${esc(t.id)}" class="w-full text-left rounded-2xl bg-black/40 border ${t.sin_leer_admin && t.estado !== "cerrado" ? "border-[#D4AF37]" : "border-white/10"} p-3">
 <div class="flex justify-between gap-2"><b class="text-sm truncate">${tipoIcon(t.tipo)} ${esc(t.tipo)} · ${esc(t.nombre)}</b><span class="text-[10px] rounded-full px-2 py-0.5 ${t.estado === "cerrado" ? "bg-zinc-800 text-gray-400" : "bg-green-700 text-white"}">${t.estado === "cerrado" ? "Cerrado" : "Abierto"}</span></div>
@@ -235,11 +237,13 @@
             const t = tickets.find(x => x.id === openId); if (!t) return;
             $("sop-head").textContent = `${tipoIcon(t.tipo)} ${t.tipo} · ${t.nombre}`; $("sop-sub").textContent = `${t.telefono}${t.viaje ? " · Viaje " + t.viaje : ""}`; $("sop-toggle").textContent = t.estado === "cerrado" ? "Reabrir reporte" : "Marcar como resuelto";
             if (t.sin_leer_admin) updateDoc(doc(db, "soporte", openId), { sin_leer_admin: false }).catch(() => { });
+            const evHtml = t.ev ? evidenceHtml({ ev: t.ev, motivo: "no_pago" }, true) : ""; if ($("sop-ev").dataset.k !== openId + (t.ev ? "1" : "0")) { $("sop-ev").innerHTML = evHtml; $("sop-ev").dataset.k = openId + (t.ev ? "1" : "0") }
+            $("sop-pen").classList.toggle("hidden", t.origen !== "chofer" || !!t.penalizado);
         }
         function openTicket(id) {
             openId = id; $("sop-list").classList.add("hidden"); $("sop-chat").classList.remove("hidden"); paintHead(); msgsUns?.();
             msgsUns = onSnapshot(query(collection(db, "soporte", id, "mensajes"), orderBy("ts")), snap => {
-                $("sop-msgs").innerHTML = snap.docs.map(d => { const m = d.data(); return `<div class="max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.de === "admin" ? "bg-[#D4AF37] text-black ml-auto" : "bg-zinc-800 mr-auto"}">${esc(m.texto)}</div>` }).join(""); $("sop-msgs").scrollTop = $("sop-msgs").scrollHeight;
+                $("sop-msgs").innerHTML = snap.docs.map(d => { const m = d.data(); return `<div class="max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-line ${m.de === "admin" ? "bg-[#D4AF37] text-black ml-auto" : "bg-zinc-800 mr-auto"}">${esc(m.texto)}</div>` }).join(""); $("sop-msgs").scrollTop = $("sop-msgs").scrollHeight;
             });
         }
         $("sop-back").onclick = () => { openId = null; msgsUns?.(); $("sop-chat").classList.add("hidden"); $("sop-list").classList.remove("hidden") };
@@ -248,6 +252,13 @@
             try { await addDoc(collection(db, "soporte", openId, "mensajes"), { de: "admin", texto, ts: serverTimestamp() }); await updateDoc(doc(db, "soporte", openId), { actualizado: serverTimestamp(), ultimo: "Soporte: " + texto.slice(0, 70), sin_leer_usuario: true }) }
             catch (e) { console.error(e); $("sop-input").value = texto; alert("No se pudo enviar la respuesta.") }
         }
+        $("sop-pen").onclick = async () => {
+            const t = tickets.find(x => x.id === openId); if (!t) return; const m = Number(prompt("Monto de la penalización (MXN):", String(t.adeudo || 20))); if (!Number.isFinite(m) || m <= 0) return;
+            try {
+                await setDoc(doc(db, "penalizaciones", "pen_" + t.id), { device: t.device || "", telefono: t.telefono || "", cliente: t.nombre || "", monto: m, motivo: "no_pago", viaje: t.viaje || "", chofer: t.chofer || "", estado: "pendiente", creado: serverTimestamp(), ev: t.ev || null });
+                await updateDoc(doc(db, "soporte", t.id), { penalizado: true, actualizado: serverTimestamp() }); await addDoc(collection(db, "soporte", t.id, "mensajes"), { de: "admin", texto: `Penalización de $${m} aplicada al pasajero.`, ts: serverTimestamp() });
+            } catch (e) { console.error(e); alert("No se pudo aplicar la penalización.") }
+        };
         $("sop-send").onclick = sopSend; $("sop-input").addEventListener("keydown", e => { if (e.key === "Enter") sopSend() });
         $("sop-toggle").onclick = () => { const t = tickets.find(x => x.id === openId); if (t) updateDoc(doc(db, "soporte", openId), { estado: t.estado === "cerrado" ? "abierto" : "cerrado", actualizado: serverTimestamp() }).catch(console.error) };
         onSnapshot(query(collection(db, "soporte"), orderBy("actualizado", "desc"), limit(60)), snap => {
@@ -255,8 +266,31 @@
             const n = tickets.filter(t => t.sin_leer_admin && t.estado !== "cerrado").length; $("sop-badge").textContent = n; $("sop-badge").classList.toggle("hidden", !n);
         }, e => console.error(e));
         // ---- Penalizaciones de pasajeros
-        const motivoTxt = { no_show: "No se presentó al viaje", cancelacion_tardia: "Canceló con el conductor en camino" };
+        const motivoTxt = { no_show: "No se presentó al viaje", cancelacion_tardia: "Canceló con el conductor en camino", no_pago: "No pagó el viaje" };
         let pens = [];
+        // Evidencia del viaje para verificar si la penalización es correcta
+        const fmtT = ms => ms ? new Date(ms).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "sin dato";
+        const gmap = pos => pos && Number.isFinite(pos.lat) ? `<a class="underline text-[#E8C766]" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${pos.lat},${pos.lng}">ver en mapa</a>` : "sin dato";
+        const durS = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+        const hav = (a, b) => { if (!a || !b) return null; const r = x => x * Math.PI / 180, dLa = r(b.lat - a.lat), dLo = r(b.lng - a.lng), h = Math.sin(dLa / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLo / 2) ** 2; return Math.round(2 * 6371000 * Math.asin(Math.sqrt(h))) };
+        function evidenceHtml(p, open) {
+            const e = p.ev; if (!e) return '<p class="text-[11px] text-gray-500 mt-2">Sin evidencia detallada (registro anterior).</p>';
+            const wait = e.t_llegada && e.t_cancel ? (e.t_cancel - e.t_llegada) / 1000 : null, since = e.t_acepto && e.t_cancel ? (e.t_cancel - e.t_acepto) / 1000 : null, moved = hav(e.acept_pos, e.cancel_pos);
+            const chk = (c, txt) => `<li class="${c === null ? "text-gray-400" : c ? "text-green-400" : "text-red-300"}">${c === null ? "• " : c ? "✓ " : "✗ "}${txt}</li>`, checks = [];
+            if (p.motivo === "no_show" || (p.ev.quien === "chofer" && !p.ev.motivo_no_pago)) checks.push(chk(wait === null ? null : wait >= 300, `Esperó 5 min o más después de "Ya llegué" (${wait === null ? "sin dato" : durS(wait)})`), chk(e.llegada_pos?.d == null ? null : e.llegada_pos.d <= 50, `Marcó llegada a 50 m o menos del punto (${e.llegada_pos?.d ?? "sin dato"} m)`), chk(e.cancel_pos?.d == null ? null : e.cancel_pos.d <= 150, `Seguía cerca del punto al cancelar (${e.cancel_pos?.d ?? "sin dato"} m)`));
+            if (p.motivo === "cancelacion_tardia") checks.push(chk(since === null ? null : since >= 300, `Pasaron 5 min o más desde que el chofer aceptó (${since === null ? "sin dato" : durS(since)})`), chk(e.t_llegada ? true : moved === null ? null : moved >= 100, e.t_llegada ? "El chofer ya había llegado al punto" : `El chofer se movió hacia el punto (${moved ?? "sin dato"} m desde que aceptó)`));
+            return `<details ${open ? "open" : ""} class="mt-2"><summary class="text-xs text-[#E8C766] cursor-pointer">Ver evidencia del viaje</summary>
+<div class="mt-2 text-[12px] space-y-1.5 text-gray-300">
+<p><b>Chofer:</b> ${esc(e.chofer_nombre || "—")} · usuario ${esc(e.chofer_id || "—")} · ${esc(e.vehiculo || "sin vehículo")}</p>
+<p><b>Pasajero:</b> ${esc(e.cliente || "—")} · ${esc(e.telefono || "—")}</p>
+<p><b>Viaje:</b> ${esc(e.viaje || "—")} · $${esc(e.tarifa ?? "—")} · ${esc(e.metodo_pago || "")}</p>
+<p><b>Recogida:</b> ${esc(e.origen || "—")} (${gmap(e.pickup)})</p><p><b>Destino:</b> ${esc(e.destino || "—")}</p>
+<p><b>Quién canceló:</b> ${e.quien === "chofer" ? "el chofer" : "el pasajero"}</p>
+<p><b>Hora en que aceptó:</b> ${fmtT(e.t_acepto)}<br><b>Hora de "Ya llegué":</b> ${fmtT(e.t_llegada)}${e.llegada_pos?.d != null ? ` (a ${esc(e.llegada_pos.d)} m del punto)` : ""}<br><b>Hora de cancelación:</b> ${fmtT(e.t_cancel)}</p>
+<p><b>Ubicación del chofer:</b><br>Al aceptar: ${gmap(e.acept_pos)}<br>Al avisar llegada: ${gmap(e.llegada_pos)}<br>Al cancelar o finalizar: ${gmap(e.cancel_pos)}${e.cancel_pos?.d != null ? ` (a ${esc(e.cancel_pos.d)} m del punto)` : ""}</p>
+${e.motivo_no_pago ? `<p><b>Monto recibido:</b> $${esc(e.monto_recibido)} · <b>Adeudo:</b> $${esc(e.adeudo)}<br><b>Motivo del pasajero:</b> ${esc(e.motivo_no_pago)}</p>` : ""}
+${checks.length ? `<ul class="space-y-0.5 pt-1">${checks.join("")}</ul>` : ""}</div></details>`;
+        }
         function paintPens() {
             const pend = pens.filter(p => p.estado === "pendiente"), list = [...pend, ...pens.filter(p => p.estado !== "pendiente")];
             $("pen-badge").textContent = pend.length; $("pen-badge").classList.toggle("hidden", !pend.length);
@@ -264,8 +298,10 @@
             $("pen-list").innerHTML = list.map(p => `<div class="rounded-2xl bg-black/40 border ${p.estado === "pendiente" ? "border-red-400/60" : "border-white/10"} p-3">
 <div class="flex justify-between gap-2"><b class="text-sm">${esc(p.cliente || "Pasajero")}</b><b class="${p.estado === "pendiente" ? "text-red-300" : "text-green-400"}">$${esc(p.monto)}</b></div>
 <p class="text-xs text-gray-300 mt-1">${esc(motivoTxt[p.motivo] || p.motivo)} · ${esc(p.telefono)}</p>
+<p class="text-xs text-gray-400">Chofer: ${esc(p.ev?.chofer_nombre || "—")} · usuario ${esc(p.chofer || p.ev?.chofer_id || "—")}</p>
 <p class="text-[11px] text-gray-500">${esc(when(p.creado))} · Dispositivo ${esc(String(p.device || "").slice(0, 8))}${p.estado === "pagada" ? " · Pagada " + esc(when(p.pagado)) : p.estado === "anulada" ? " · Anulada" : ""}</p>
-${p.estado === "pendiente" ? `<div class="flex gap-2 mt-2"><button type="button" data-pen-pay="${esc(p.id)}" class="flex-1 rounded-xl bg-[#D4AF37] text-black font-bold text-sm py-2">Marcar como pagada</button><button type="button" data-pen-void="${esc(p.id)}" class="rounded-xl border border-white/20 text-xs px-3">Anular</button></div>` : ""}</div>`).join("") || '<p class="text-xs text-gray-400 bg-zinc-900/80 rounded-xl p-3">Sin registros.</p>';
+${evidenceHtml(p, false)}
+${p.estado === "pendiente" ? `<div class="flex gap-2 mt-3"><button type="button" data-pen-pay="${esc(p.id)}" class="flex-1 rounded-xl bg-[#D4AF37] text-black font-bold text-sm py-2">Marcar como pagada</button><button type="button" data-pen-void="${esc(p.id)}" class="rounded-xl border border-white/20 text-xs px-3">Anular</button></div>` : ""}</div>`).join("") || '<p class="text-xs text-gray-400 bg-zinc-900/80 rounded-xl p-3">Sin registros.</p>';
         }
         $("pen-list").addEventListener("click", e => {
             const pay = e.target.closest("[data-pen-pay]"), vo = e.target.closest("[data-pen-void]"), id = (pay || vo)?.dataset[pay ? "penPay" : "penVoid"]; if (!id) return;
