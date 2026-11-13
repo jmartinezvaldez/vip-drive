@@ -261,9 +261,15 @@
         let routeMode = "";
         // Próximo punto del viaje: la siguiente parada pendiente o, si no quedan, el destino final
         function nextTarget(r) { const ps = r?.paradas || [], i = r?.parada_actual || 0; return i < ps.length ? { lat: ps[i].lat, lng: ps[i].lng, stop: i } : { lat: r?.dest_lat, lng: r?.dest_lng, stop: -1 } }
+        // "Ya llegué" solo se activa a 50 m o menos del punto de recogida
+        function pickupDist() { const p = marker?.getLatLng?.(); return p && ride?.lat != null ? km(p.lat, p.lng, ride.lat, ride.lng) * 1000 : null }
+        function updateArriveBtn() {
+            if (!ride || ride.chofer_llego || ride.viaje_iniciado) return; const b = $("arrived"), d = pickupDist(), near = d !== null && d <= 50;
+            b.disabled = !near; b.textContent = near ? "📍 YA LLEGUÉ" : d === null ? "📍 ESPERANDO TU GPS…" : `📍 ACÉRCATE · A ${d >= 1000 ? (d / 1000).toFixed(1) + " KM" : Math.round(d) + " M"} DEL PUNTO`;
+        }
         function syncArrival() { chatAttach();
             const l = !!ride?.chofer_llego, s = !!ride?.viaje_iniciado, b = $("arrived"), nt = nextTarget(ride), total = ride?.paradas?.length || 0;
-            b.classList.toggle("hidden", s); b.disabled = false; b.textContent = l ? "▶ INICIAR VIAJE" : "📍 YA LLEGUÉ";
+            b.classList.toggle("hidden", s); b.disabled = false; b.textContent = l ? "▶ INICIAR VIAJE" : "📍 YA LLEGUÉ"; updateArriveBtn();
             $("stop-arrived").classList.toggle("hidden", !(s && nt.stop >= 0)); $("finish").classList.toggle("hidden", !(s && nt.stop < 0));
             if (s && nt.stop >= 0) { $("stop-arrived").disabled = false; $("stop-arrived").textContent = `📍 LLEGUÉ A LA PARADA ${nt.stop + 1}${total > 1 ? " DE " + total : ""}` }
             if (!s) routeMode = "";
@@ -460,7 +466,7 @@
         }
         $("accept").onclick = acceptRide; $("reject").onclick = () => rejectRide(false); $("queue-accept").onclick = acceptQueued; $("queue-reject").onclick = () => rejectQueued(false);
         $("arrived").onclick = async () => {
-            if (!ride || ride.estado !== "aceptado" || ride.viaje_iniciado) return; $("arrived").disabled = true;
+            if (!ride || ride.estado !== "aceptado" || ride.viaje_iniciado) return; if (!ride.chofer_llego) { const d = pickupDist(); if (d === null || d > 50) { updateArriveBtn(); alert(d === null ? "Aún no tenemos tu ubicación GPS. Espera unos segundos." : "Debes estar a menos de 50 metros del punto de recogida para avisar que llegaste."); return } } $("arrived").disabled = true;
             const arriving = !ride.chofer_llego;
             try {
                 const now = Date.now(), waitMs = arriving ? 0 : Math.max(0, now - (ride.llegada_ms || now)), fee = waitFee(waitMs);
@@ -478,7 +484,7 @@
         // Espera gratis de 3 min; después $3 por minuto iniciado hasta que el conductor inicia el viaje
         const waitFee = ms => 3 * Math.ceil(Math.max(0, ms - 180000) / 60000), mmss = s => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
         setInterval(() => {
-            const on = ride?.estado === "aceptado" && ride.chofer_llego && !ride.viaje_iniciado && ride.llegada_ms; $("wait-box").classList.toggle("hidden", !on); const noShow = !!on && Date.now() - ride.llegada_ms >= 300000, want = noShow ? "🚫 PASAJERO NO SE PRESENTÓ · CANCELAR" : "CANCELAR VIAJE"; if ($("cancel-active").textContent !== want) $("cancel-active").textContent = want; if (!on) return;
+            updateArriveBtn(); const on = ride?.estado === "aceptado" && ride.chofer_llego && !ride.viaje_iniciado && ride.llegada_ms; $("wait-box").classList.toggle("hidden", !on); const noShow = !!on && Date.now() - ride.llegada_ms >= 300000, want = noShow ? "🚫 PASAJERO NO SE PRESENTÓ · CANCELAR" : "CANCELAR VIAJE"; if ($("cancel-active").textContent !== want) $("cancel-active").textContent = want; if (!on) return;
             const ms = Date.now() - ride.llegada_ms; $("wait-time").textContent = mmss(Math.floor(ms / 1000));
             $("wait-fee").textContent = ms < 180000 ? `Espera gratis · quedan ${mmss(Math.ceil((180000 - ms) / 1000))}` : `Tiempo extra · +$${waitFee(ms)} ($3 por minuto)` + (ms >= 300000 ? " · Ya puedes cancelar: el pasajero no se presentó" : "");
         }, 1000);
@@ -497,10 +503,11 @@
             catch (e) { console.error(e); $("cobro-ok").disabled = false; alert("No se pudo finalizar el viaje. Revisa tu conexión.") }
         };
         new MutationObserver(() => { if ($("active-card").classList.contains("hidden")) $("cobro").classList.add("hidden") }).observe($("active-card"), { attributes: true, attributeFilter: ["class"] });
-        $("cancel-active").onclick = async () => { if (!ride) return; const noShow = ride.estado === "aceptado" && ride.chofer_llego && !ride.viaje_iniciado && ride.llegada_ms && Date.now() - ride.llegada_ms >= 300000;
+        $("cancel-active").onclick = async () => { if (!ride) return; const r = ride, noShow = r.estado === "aceptado" && r.chofer_llego && !r.viaje_iniciado && r.llegada_ms && Date.now() - r.llegada_ms >= 300000;
             if (!confirm(noShow ? "El pasajero no se presentó después de 5 minutos.\n\nAl cancelar se le aplicará una penalización de $20 y no podrá pedir otro viaje hasta pagarla al administrador.\n\n¿Cancelar el viaje?" : "¿Seguro que deseas cancelar este viaje?")) return;
-            try { await updateDoc(doc(db, "viajes", ride.id), { estado: "cancelado_chofer", fecha_cancel: serverTimestamp(), ...(noShow ? { motivo: "pasajero_no_se_presento", penalizado: true } : {}) });
-                if (noShow) await addDoc(collection(db, "penalizaciones"), { device: ride.device || "", telefono: ride.telefono || "", cliente: ride.cliente || "", monto: 20, motivo: "no_show", viaje: ride.id, chofer: driverId, estado: "pendiente", creado: serverTimestamp() }); await setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); ride = null; if (queuedRide) { promoteQueued(); return } show("cancelled-card"); $("cancelled-reason").textContent = noShow ? "Se aplicó la penalización de $20 al pasajero." : "Cancelaste el viaje."; if (routeLine) map.removeLayer(routeLine) } catch { alert("No se pudo cancelar el viaje.") } };
+            try {
+                if (noShow) await setDoc(doc(db, "penalizaciones", "pen_" + r.id), { device: r.device || "", telefono: r.telefono || "", cliente: r.cliente || "", monto: 20, motivo: "no_show", viaje: r.id, chofer: driverId, estado: "pendiente", creado: serverTimestamp() });
+                await updateDoc(doc(db, "viajes", r.id), { estado: "cancelado_chofer", fecha_cancel: serverTimestamp(), ...(noShow ? { motivo: "pasajero_no_se_presento", penalizado: true } : {}) }); await setDoc(doc(db, "choferes", driverId), { disponible: true, online: true, lastUpdate: serverTimestamp() }, { merge: true }); ride = null; if (queuedRide) { promoteQueued(); return } show("cancelled-card"); $("cancelled-reason").textContent = noShow ? "Se aplicó la penalización de $20 al pasajero." : "Cancelaste el viaje."; if (routeLine) map.removeLayer(routeLine) } catch (e) { console.error(e); alert("No se pudo cancelar el viaje. Revisa tu conexión e inténtalo de nuevo.") } };
         $("dismiss-cancelled").onclick = () => { show(null); if (online) listenRequests() };
         window.addEventListener("beforeunload", () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId) });
         async function hashPass(pass, saltB64) {
