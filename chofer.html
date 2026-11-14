@@ -88,10 +88,16 @@
     </style>
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest-chofer.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="VIPDRIVE Conductor">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vipdrive.css">
+    <script src="pwa.js" defer></script>
 </head>
 
 <body class="vd-driver">
@@ -124,6 +130,10 @@
                 <div id="veh-list" class="mt-2 space-y-2" role="radiogroup" aria-label="Vehículo de trabajo"></div>
                 <p id="veh-note" class="text-[11px] muted mt-2"></p>
             </div>
+            <button data-install type="button" class="hidden w-full rounded-2xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 py-3 font-extrabold text-[#F0D78C]">📲 Instalar app de conductor (recomendado)</button>
+            <button id="ac-toggle" type="button" role="switch" aria-checked="false" class="hidden w-full flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 font-extrabold">
+                <span>❄️ Aire acondicionado</span><span id="ac-state" class="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-gray-300">Apagado</span>
+            </button>
             <button id="wallet-open" type="button" class="hidden w-full rounded-2xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 py-3 font-extrabold text-[#F0D78C]">💰 Mi cartera</button>
             <div id="id-gate" class="panel hidden">
                 <h2 class="font-black text-lg">Entra a tu cuenta</h2>
@@ -154,6 +164,7 @@
                 <div class="vd-req-bar"><div id="request-bar" class="vd-req-bar-fill"></div></div>
                 <p id="request-countdown" class="vd-req-count">Tienes 20 segundos para responder</p>
                 <b id="request-fare" class="vd-req-fare"></b>
+                <span id="request-surge" class="hidden vd-chip mt-2 inline-block"></span>
                 <p id="request-eta" class="vd-req-eta"></p>
                 <div class="vd-req-info">
                     <p id="request-client"></p><p id="request-phone"></p><p id="request-pickup"></p><p id="request-destination"></p>
@@ -307,7 +318,7 @@
             if (!driverId) { if (authed) { location.replace("?id=" + encodeURIComponent(authed)); return } showGate(); return }
             if (authed !== driverId) { showGate(driverId); return }
             $("driver-id").textContent = "ID: " + driverId;
-            try { const snap = await getDoc(doc(db, "choferes", driverId)); if (!snap.exists()) { $("driver-status").textContent = "NO REGISTRADO"; setMessage("Este conductor no está registrado en VIPDRIVE."); $("toggle-online").disabled = true; return } driverData = snap.data(); store.set("vipdrive_driver_id", driverId); $("logout").classList.remove("hidden"); $("wallet-open").classList.remove("hidden"); renderVehicles(); $("driver-name").textContent = driverData.nombre || "Conductor"; resumeRide() }
+            try { const snap = await getDoc(doc(db, "choferes", driverId)); if (!snap.exists()) { $("driver-status").textContent = "NO REGISTRADO"; setMessage("Este conductor no está registrado en VIPDRIVE."); $("toggle-online").disabled = true; return } driverData = snap.data(); store.set("vipdrive_driver_id", driverId); $("logout").classList.remove("hidden"); $("wallet-open").classList.remove("hidden"); acOn = driverData.aire === true; $("ac-toggle").classList.remove("hidden"); paintAc(); renderVehicles(); $("driver-name").textContent = driverData.nombre || "Conductor"; resumeRide() }
             catch (e) { setMessage("No se pudo cargar tu cuenta. Revisa tu conexión y Firebase."); console.error(e) }
         }
         // ---- Chat con el pasajero (mientras el viaje está aceptado)
@@ -356,6 +367,14 @@
         }
         $("wallet-open").onclick = openWallet; $("wallet-close").onclick = () => $("wallet").classList.add("hidden");
         document.querySelectorAll("[data-wp]").forEach(b => b.onclick = () => { walletPeriod = b.dataset.wp; paintWallet() });
+        // Aire acondicionado: el pasajero lo ve en el perfil y queda registrado en cada viaje como evidencia
+        let acOn = false;
+        function paintAc() { const b = $("ac-toggle"); b.setAttribute("aria-checked", acOn); $("ac-state").textContent = acOn ? "Encendido" : "Apagado"; $("ac-state").className = "rounded-full px-3 py-1 text-xs font-black " + (acOn ? "bg-[#D4AF37] text-black" : "bg-white/10 text-gray-300"); b.classList.toggle("border-[#D4AF37]", acOn) }
+        $("ac-toggle").onclick = async () => {
+            acOn = !acOn; paintAc();
+            try { await updateDoc(doc(db, "choferes", driverId), { aire: acOn, aire_ms: Date.now() }); if (ride?.estado === "aceptado") updateDoc(doc(db, "viajes", ride.id), { aire_actual: acOn, aire_cambio_ms: Date.now() }).catch(() => { }) }
+            catch (e) { console.error(e); acOn = !acOn; paintAc(); setMessage("No se pudo cambiar el aire acondicionado. Revisa tu conexión.") }
+        };
         function fillActive() {
             $("active-client").textContent = "Pasajero: " + (ride.cliente || ""); $("active-phone").textContent = "Teléfono: " + (ride.telefono || ""); $("active-destination").textContent = "Destino: " + (ride.destino || ""); $("active-fare").textContent = "$" + ride.tarifa_final; $("active-pickup").textContent = "Recoger en: " + (ride.origen || "Ubicación del pasajero"); $("active-eta").textContent = "";
             $("navigate-pickup").href = `https://www.google.com/maps/dir/?api=1&destination=${ride.lat},${ride.lng}&travelmode=driving`; $("navigate-destination").href = `https://www.google.com/maps/dir/?api=1&destination=${ride.dest_lat},${ride.dest_lng}&travelmode=driving`; syncArrival();
@@ -376,7 +395,7 @@
         function renderQueue() {
             const q = queuedRide; clearInterval(queueTimer); let s = 20;
             $("queue-client").textContent = "Pasajero: " + (q.cliente || "Sin nombre");
-            $("queue-info").textContent = `Recoger en: ${q.origen || "ubicación del pasajero"} · a ${km(ride.dest_lat, ride.dest_lng, q.lat, q.lng).toFixed(1)} km de tu destino${q.paradas?.length ? ` · ${q.paradas.length} parada${q.paradas.length > 1 ? "s" : ""}` : ""} · Pago: ${q.metodo_pago === "transferencia" ? "transferencia" : "efectivo"}`;
+            $("queue-info").textContent = `Recoger en: ${q.origen || "ubicación del pasajero"} · a ${km(ride.dest_lat, ride.dest_lng, q.lat, q.lng).toFixed(1)} km de tu destino${q.paradas?.length ? ` · ${q.paradas.length} parada${q.paradas.length > 1 ? "s" : ""}` : ""} · Pago: ${q.metodo_pago === "transferencia" ? "transferencia" : "efectivo"}${Number(q.recargo_pct) > 0 ? " · 📈 +" + q.recargo_pct + "%" : ""}`;
             $("queue-fare").textContent = "$" + (q.tarifa_final ?? "—"); $("queue-bar").style.width = "100%"; $("queue-count").textContent = "Tienes 20 segundos para responder"; $("queue-card").classList.remove("hidden");
             queueTimer = setInterval(() => { s--; $("queue-bar").style.width = Math.max(0, s / 20 * 100) + "%"; $("queue-count").textContent = `Tiempo para responder: ${s}s`; if (s <= 0) rejectQueued(true) }, 1000);
             
@@ -401,7 +420,7 @@
         function promoteQueued() {
             const q = queuedRide; queueUnsub?.(); queueUnsub = null; queuedRide = null; $("queued-info").classList.add("hidden"); if (activeUnsub) activeUnsub(); if (routeLine) { map.removeLayer(routeLine); routeLine = null }
             ride = { ...q, en_cola: false }; routeMode = ""; lastRoute = 0; show("active-card"); fillActive(); watchRide();
-            updateDoc(doc(db, "viajes", ride.id), { en_cola: false, chofer_acepto: serverTimestamp(), chofer_lat: myPos()[0], chofer_lng: myPos()[1] }).catch(console.error);
+            updateDoc(doc(db, "viajes", ride.id), { en_cola: false, chofer_acepto: serverTimestamp(), chofer_lat: myPos()[0], chofer_lng: myPos()[1], aire_acepto: acOn }).catch(console.error);
             setDoc(doc(db, "choferes", driverId), { disponible: false, por_liberar: false, online: true, lastUpdate: serverTimestamp() }, { merge: true }).catch(console.error);
             setMessage("Siguiente viaje: ve por el pasajero."); navigator.vibrate?.([200, 100, 200]); drawRoute(...myPos(), ride.lat, ride.lng).then(showEta);
         }
@@ -449,6 +468,7 @@
             if (requestTimer) clearInterval(requestTimer); seconds = 20; $("request-bar").style.width = "100%"; $("request-countdown").textContent = "Tienes 20 segundos para responder";
             requestTimer = setInterval(() => { seconds--; $("request-bar").style.width = Math.max(0, seconds / 20 * 100) + "%"; $("request-countdown").textContent = `Tiempo para responder: ${seconds}s`; if (seconds <= 0) rejectRide(true) }, 1000);
             $("request-pickup").textContent = "Salida: " + (v.origen || "Ubicación del pasajero (ver mapa)") + (v.paradas?.length ? ` · ${v.paradas.length} parada${v.paradas.length > 1 ? "s" : ""}` : "") + " · Pago: " + (v.metodo_pago === "transferencia" ? "transferencia" : "efectivo");
+            { const sg = $("request-surge"), pc = Number(v.recargo_pct || 0); sg.classList.toggle("hidden", !(pc > 0)); if (pc > 0) sg.textContent = `📈 Tarifa +${pc}% por demanda${v.zona_recargo ? " · " + v.zona_recargo : ""}` }
             { const [a, b] = myPos(); $("request-eta").textContent = "Calculando tiempo de llegada…"; drawRoute(a, b, v.lat, v.lng).then(r => r ? showEta(r) : $("request-eta").textContent = `A ${km(a, b, v.lat, v.lng).toFixed(1)} km del pasajero`) }
             
         }
@@ -464,7 +484,7 @@
             if (!ride || handlingRequest) return; handlingRequest = true; if (requestTimer) clearInterval(requestTimer);
             try {
                 const ref = doc(db, "viajes", ride.id), fresh = await getDoc(ref); if (!fresh.exists() || fresh.data().estado !== "solicitado_chofer") throw Error("Esta solicitud ya no está disponible.");
-                await updateDoc(ref, { estado: "aceptado", chofer: driverId, chofer_acepto: serverTimestamp(), chofer_lat: myPos()[0], chofer_lng: myPos()[1] });
+                await updateDoc(ref, { estado: "aceptado", chofer: driverId, chofer_acepto: serverTimestamp(), chofer_lat: myPos()[0], chofer_lng: myPos()[1], aire_acepto: acOn });
                 ride = { ...ride, estado: "aceptado" }; await setDoc(doc(db, "choferes", driverId), { disponible: false, online: true, lastUpdate: serverTimestamp() }, { merge: true });
                 show("active-card"); $("active-client").textContent = "Pasajero: " + (ride.cliente || ""); $("active-phone").textContent = "Teléfono: " + (ride.telefono || ""); $("active-destination").textContent = "Destino: " + (ride.destino || ""); $("active-fare").textContent = "$" + ride.tarifa_final; $("active-pickup").textContent = "Recoger en: " + (ride.origen || "Ubicación del pasajero"); $("active-eta").textContent = ""; syncArrival();
                 $("navigate-pickup").href = `https://www.google.com/maps/dir/?api=1&destination=${ride.lat},${ride.lng}&travelmode=driving`;
@@ -485,8 +505,8 @@
             try {
                 const now = Date.now(), waitMs = arriving ? 0 : Math.max(0, now - (ride.llegada_ms || now)), fee = waitFee(waitMs);
                 const pp = curPos(), dm = pickupDist(), arrPos = pp ? { llegada_lat: pp.lat, llegada_lng: pp.lng, llegada_dist_m: dm === null ? null : Math.round(dm) } : {};
-                const extra = arriving ? { chofer_llego: true, llegada: serverTimestamp(), llegada_ms: now, ...arrPos } : { viaje_iniciado: true, inicio: serverTimestamp(), espera_seg: Math.round(waitMs / 1000), tarifa_espera: fee };
-                const local = arriving ? { chofer_llego: true, llegada_ms: now, ...arrPos } : { viaje_iniciado: true, espera_seg: Math.round(waitMs / 1000), tarifa_espera: fee };
+                const extra = arriving ? { chofer_llego: true, llegada: serverTimestamp(), llegada_ms: now, ...arrPos } : { viaje_iniciado: true, inicio: serverTimestamp(), espera_seg: Math.round(waitMs / 1000), tarifa_espera: fee, aire_inicio: acOn };
+                const local = arriving ? { chofer_llego: true, llegada_ms: now, ...arrPos } : { viaje_iniciado: true, espera_seg: Math.round(waitMs / 1000), tarifa_espera: fee, aire_inicio: acOn };
                 await updateDoc(doc(db, "viajes", ride.id), extra);
                 ride = { ...ride, ...local }; syncArrival(); navigator.vibrate?.(100);
             } catch (e) { console.error(e); $("arrived").disabled = false; alert(arriving ? "No se pudo avisar al pasajero. Revisa tu conexión." : "No se pudo iniciar el viaje. Revisa tu conexión.") }
@@ -516,7 +536,7 @@
         const curPos = () => { const p = marker?.getLatLng?.(); return p ? { lat: p.lat, lng: p.lng } : null };
         function buildEv(r, extra = {}) {
             const p = curPos(), d = p && r.lat != null ? Math.round(km(p.lat, p.lng, r.lat, r.lng) * 1000) : null, ms = v => v?.toMillis?.() || null;
-            return { quien: "chofer", chofer_id: driverId, chofer_nombre: driverData?.nombre || "", vehiculo: [driverData?.auto, driverData?.placas].filter(Boolean).join(" · "), viaje: r.id, cliente: r.cliente || "", telefono: r.telefono || "", origen: r.origen || "", destino: r.destino || "", tarifa: rideTotal(r), metodo_pago: r.metodo_pago || "efectivo",
+            return { quien: "chofer", aire_acepto: r.aire_acepto ?? null, aire_inicio: r.aire_inicio ?? null, aire_actual: acOn, chofer_id: driverId, chofer_nombre: driverData?.nombre || "", vehiculo: [driverData?.auto, driverData?.placas].filter(Boolean).join(" · "), viaje: r.id, cliente: r.cliente || "", telefono: r.telefono || "", origen: r.origen || "", destino: r.destino || "", tarifa: rideTotal(r), metodo_pago: r.metodo_pago || "efectivo",
                 pickup: r.lat != null ? { lat: r.lat, lng: r.lng } : null, t_acepto: ms(r.chofer_acepto), t_llegada: r.llegada_ms || null, t_cancel: Date.now(), acept_pos: r.chofer_lat != null ? { lat: r.chofer_lat, lng: r.chofer_lng } : null,
                 llegada_pos: r.llegada_lat != null ? { lat: r.llegada_lat, lng: r.llegada_lng, d: r.llegada_dist_m ?? null } : null, cancel_pos: p ? { ...p, d } : null, ...extra };
         }
