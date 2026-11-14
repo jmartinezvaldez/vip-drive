@@ -137,10 +137,16 @@
     </style>
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="VIPDRIVE">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vipdrive.css">
+    <script src="pwa.js" defer></script>
 </head>
 
 <body class="vd-rider">
@@ -167,6 +173,7 @@
                     </div>
                     <span class="pill bg-[#FBF6E6] text-[#8A6A00]">MAZATLÁN</span>
                 </div>
+                <button data-install type="button" class="hidden secondary w-full mb-3">📲 Instalar app VIPDRIVE en tu celular</button>
                 <div id="pen-banner" class="hidden mb-3 rounded-2xl border border-red-300 bg-red-50 p-3 text-sm" role="alert">
                     <p id="pen-text" class="font-bold text-red-800"></p>
                     <button id="pen-help" type="button" class="secondary w-full mt-2">💬 Contactar a soporte para pagar</button>
@@ -274,6 +281,7 @@
             <p id="pf-count" class="text-[11px] text-gray-500 mt-1 text-center"></p>
             <h2 id="pf-name" class="text-xl font-extrabold mt-2"></h2>
             <p id="pf-car" class="text-sm text-gray-600"></p>
+            <p id="pf-aire" class="hidden"></p>
             <div class="grid grid-cols-2 gap-2 mt-3">
                 <div class="rounded-xl bg-gray-50 p-3"><p class="text-[11px] text-gray-500">Placas</p><b id="pf-plate" class="text-sm"></b></div>
                 <div class="rounded-xl bg-gray-50 p-3"><p class="text-[11px] text-gray-500">Distancia a ti</p><b id="pf-dist" class="text-sm"></b></div>
@@ -329,7 +337,7 @@
         const $ = id => document.getElementById(id);
         const store = { get(k) { try { return localStorage.getItem(k) || "" } catch { return "" } }, set(k, v) { try { localStorage.setItem(k, v) } catch { } } };
         const DEFAULT = { lat: 23.2329, lng: -106.4111 };
-        let pendingPens = [], pickupCustom = false, stops = [], payMethod = "efectivo", myLat = DEFAULT.lat, myLng = DEFAULT.lng, destLat = null, destLng = null, routeKm = 0, map, routeLine = null, pickupMarker = null, destinationMarker = null;
+        let zones = [], pendingPens = [], pickupCustom = false, stops = [], payMethod = "efectivo", myLat = DEFAULT.lat, myLng = DEFAULT.lng, destLat = null, destLng = null, routeKm = 0, map, routeLine = null, pickupMarker = null, destinationMarker = null;
         let mode = "pick", rideCancelled = false, arrivedNotified = false, ratingShown = false, drivers = new Map(), selectedDriver = null, rideId = null, unsubscribeRide = null, unsubscribeDrivers = null, requestBusy = false, lastRouteAt = 0;
 
         map = L.map("map", { zoomControl: false }).setView([myLat, myLng], 14);
@@ -413,7 +421,7 @@
                 if (mode === "auto") { const next = availableDrivers().find(d => !tried.has(d.id)); if (next) return sendRide(next, name, phone, tried); throw Error("No hay conductores disponibles en este momento.") }
                 throw Error("El conductor ya no está disponible. Elige otro.");
             }
-            const origen = pickupCustom ? $("pickup").value.trim() : await reverseLabel(myLat, myLng); const ref = await addDoc(collection(db, "viajes"), { cliente: name, telefono: phone, device: deviceId, destino: $("destination").value.trim(), km: Number(routeKm.toFixed(2)), tarifa_final: fareTotal(), lat: myLat, lng: myLng, origen, paradas: stopPts().map(({ lat, lng, label }) => ({ lat, lng, label: label || "" })), tarifa_paradas: stopFee(), metodo_pago: payMethod, dest_lat: destLat, dest_lng: destLng, chofer_solicitado: driver.id, chofer_nombre: driver.nombre || "Conductor", modo_asignacion: mode === "auto" ? "mas_cercano" : "elegido", estado: "solicitado_chofer", fecha: serverTimestamp() });
+            const origen = pickupCustom ? $("pickup").value.trim() : await reverseLabel(myLat, myLng); const ref = await addDoc(collection(db, "viajes"), { cliente: name, telefono: phone, device: deviceId, destino: $("destination").value.trim(), km: Number(routeKm.toFixed(2)), tarifa_final: fareTotal(), lat: myLat, lng: myLng, origen, paradas: stopPts().map(({ lat, lng, label }) => ({ lat, lng, label: label || "" })), tarifa_paradas: stopFee(), recargo_pct: surgePct(), zona_recargo: surgeZone()?.nombre || "", tarifa_base: baseFare(), metodo_pago: payMethod, dest_lat: destLat, dest_lng: destLng, chofer_solicitado: driver.id, chofer_nombre: driver.nombre || "Conductor", modo_asignacion: mode === "auto" ? "mas_cercano" : "elegido", estado: "solicitado_chofer", fecha: serverTimestamp() });
             store.set("vipdrive_active_ride", ref.id); trackRide(ref.id, driver, name, phone, tried, { fare: fareTotal(), km: routeKm });
         }
         function trackRide(id, driver, name, phone, tried, info) {
@@ -443,7 +451,7 @@
         };
         const cancelLabel = $("cancel-ride").textContent.trim();
         const cancelRideHandler = $("cancel-ride").onclick = async () => { if (!rideId) return; const penal = penaltyApplies(); if (!confirm(penal ? `⚠ Tu conductor ya está en camino.\n\nSi cancelas ahora se te aplicará una penalización de $${PEN}, que deberás pagar al administrador para volver a pedir viajes.\n\n¿Seguro que quieres cancelar?` : "¿Seguro que deseas cancelar la solicitud?")) return; rideCancelled = true; try { await updateDoc(doc(db, "viajes", rideId), { estado: "cancelado_cliente", fecha_cancel: serverTimestamp(), ...(penal ? { penalizado: true, motivo: "cancelacion_tardia" } : {}) }); if (penal) await addDoc(collection(db, "penalizaciones"), { device: deviceId, telefono: curRide?.telefono || $("passenger-phone").value.trim(), cliente: curRide?.cliente || "", monto: PEN, motivo: "cancelacion_tardia", viaje: rideId, chofer: curRide?.chofer_solicitado || "", estado: "pendiente", creado: serverTimestamp(),
-                ev: (() => { const dd = drivers.get(curRide?.chofer_solicitado) || {}, ms = z => z?.toMillis?.() || null, c = curRide || {}; return { quien: "pasajero", chofer_id: c.chofer_solicitado || "", chofer_nombre: c.chofer_nombre || dd.nombre || "", vehiculo: [dd.auto, dd.placas].filter(Boolean).join(" · "), viaje: rideId, cliente: c.cliente || "", telefono: c.telefono || "", origen: c.origen || "", destino: c.destino || "", tarifa: Number(c.tarifa_final || 0), metodo_pago: c.metodo_pago || "efectivo", pickup: c.lat != null ? { lat: c.lat, lng: c.lng } : null, t_acepto: ms(c.chofer_acepto), t_llegada: c.llegada_ms || null, t_cancel: Date.now(), acept_pos: c.chofer_lat != null ? { lat: c.chofer_lat, lng: c.chofer_lng } : null, llegada_pos: c.llegada_lat != null ? { lat: c.llegada_lat, lng: c.llegada_lng, d: c.llegada_dist_m ?? null } : null, cancel_pos: Number.isFinite(dd.lat) ? { lat: dd.lat, lng: dd.lng, d: c.lat != null ? Math.round(distanceKm(dd.lat, dd.lng, c.lat, c.lng) * 1000) : null } : null } })() }); $("waiting-status").textContent = penal ? `Solicitud cancelada. Se aplicó una penalización de $${PEN}: págala al administrador para pedir otro viaje.` : "Solicitud cancelada."; store.set("vipdrive_active_ride", ""); $("cancel-ride").textContent = "VOLVER AL INICIO"; $("cancel-ride").onclick = () => location.reload(); if (unsubscribeRide) unsubscribeRide(); } catch { rideCancelled = false; alert("No se pudo cancelar. Comprueba tu conexión.") } };
+                ev: (() => { const dd = drivers.get(curRide?.chofer_solicitado) || {}, ms = z => z?.toMillis?.() || null, c = curRide || {}; return { quien: "pasajero", chofer_id: c.chofer_solicitado || "", chofer_nombre: c.chofer_nombre || dd.nombre || "", vehiculo: [dd.auto, dd.placas].filter(Boolean).join(" · "), viaje: rideId, cliente: c.cliente || "", telefono: c.telefono || "", origen: c.origen || "", destino: c.destino || "", tarifa: Number(c.tarifa_final || 0), metodo_pago: c.metodo_pago || "efectivo", pickup: c.lat != null ? { lat: c.lat, lng: c.lng } : null, t_acepto: ms(c.chofer_acepto), t_llegada: c.llegada_ms || null, aire_acepto: c.aire_acepto ?? null, aire_inicio: c.aire_inicio ?? null, aire_actual: c.aire_actual ?? null, aire_conductor_ahora: typeof dd.aire === "boolean" ? dd.aire : null, t_cancel: Date.now(), acept_pos: c.chofer_lat != null ? { lat: c.chofer_lat, lng: c.chofer_lng } : null, llegada_pos: c.llegada_lat != null ? { lat: c.llegada_lat, lng: c.llegada_lng, d: c.llegada_dist_m ?? null } : null, cancel_pos: Number.isFinite(dd.lat) ? { lat: dd.lat, lng: dd.lng, d: c.lat != null ? Math.round(distanceKm(dd.lat, dd.lng, c.lat, c.lng) * 1000) : null } : null } })() }); $("waiting-status").textContent = penal ? `Solicitud cancelada. Se aplicó una penalización de $${PEN}: págala al administrador para pedir otro viaje.` : "Solicitud cancelada."; store.set("vipdrive_active_ride", ""); $("cancel-ride").textContent = "VOLVER AL INICIO"; $("cancel-ride").onclick = () => location.reload(); if (unsubscribeRide) unsubscribeRide(); } catch { rideCancelled = false; alert("No se pudo cancelar. Comprueba tu conexión.") } };
         // Sugerencias de destino (Photon/OpenStreetMap, gratuito), llegada del conductor y calificación
         const phCache = new Map();
         async function photon(q, signal) {
@@ -508,9 +516,14 @@
         const stopMarkers = [];
         function stopPts() { return stops.filter(s => Number.isFinite(s.lat)) }
         function stopFee() { return routeKm > 0 && routeKm <= 3.5 ? 10 * stopPts().length : 0 }
-        function fareTotal() { return fare(routeKm) + stopFee() }
+        // Tarifa aumentada por demanda: según la zona donde empieza el viaje (el pasajero no ve el porcentaje)
+        function surgeZone() { let best = null; for (const z of zones) { if (z.activa === false) continue; if (distanceKm(myLat, myLng, z.lat, z.lng) * 1000 <= Number(z.radio_m || 0) && (!best || Number(z.porcentaje) > Number(best.porcentaje))) best = z } return best }
+        const surgePct = () => Number(surgeZone()?.porcentaje || 0);
+        const baseFare = () => fare(routeKm) + stopFee();
+        function fareTotal() { return Math.round(baseFare() * (1 + surgePct() / 100)) }
+        function surgeNote() { const el = $("surge-note"); if (el) el.classList.toggle("hidden", !(surgePct() > 0 && destLat !== null)) }
         function drawStops() { stopMarkers.splice(0).forEach(m => map.removeLayer(m)); stopPts().forEach((s, i) => stopMarkers.push(L.marker([s.lat, s.lng]).addTo(map).bindPopup("Parada " + (i + 1)))) }
-        function stopNote() { const n = stopPts().length, el = $("stop-note"); el.classList.toggle("hidden", !n); el.textContent = !n ? "" : stopFee() ? `Paradas: +$${stopFee()} ($10 por parada en viajes de hasta 3.5 km).` : "En viajes de más de 3.5 km las paradas no tienen cargo extra; solo se suma la distancia recorrida." }
+        function stopNote() { surgeNote(); const n = stopPts().length, el = $("stop-note"); el.classList.toggle("hidden", !n); el.textContent = !n ? "" : stopFee() ? `Paradas: +$${stopFee()} ($10 por parada en viajes de hasta 3.5 km).` : "En viajes de más de 3.5 km las paradas no tienen cargo extra; solo se suma la distancia recorrida." }
         function recalc() { if (destLat !== null) selectDestination(destLat, destLng, $("destination").value); else { drawStops(); stopNote(); renderDrivers() } }
         function addStopRow() {
             if (stops.length >= 3) return; const s = { lat: null, lng: null }, row = document.createElement("div"), inp = document.createElement("input"), x = document.createElement("button"); stops.push(s);
@@ -570,7 +583,8 @@
             if (!nombre || !telefono) return alert("Escribe tu nombre y teléfono."); if (texto.length < 5) return alert("Cuéntanos qué pasó (mínimo 5 caracteres).");
             $("sup-create").disabled = true;
             try {
-                const t = await addDoc(collection(db, "soporte"), { nombre, telefono, tipo, viaje: rideId || store.get("vipdrive_last_ride") || "", estado: "abierto", creado: serverTimestamp(), actualizado: serverTimestamp(), ultimo: texto.slice(0, 80), sin_leer_admin: true, sin_leer_usuario: false });
+                const vId = rideId || store.get("vipdrive_last_ride") || "", ev = /conductor|factur/i.test(tipo) ? null : await rideEvidence(vId);
+                const t = await addDoc(collection(db, "soporte"), { nombre, telefono, tipo, viaje: vId, ev, estado: "abierto", creado: serverTimestamp(), actualizado: serverTimestamp(), ultimo: texto.slice(0, 80), sin_leer_admin: true, sin_leer_usuario: false });
                 await addDoc(collection(db, "soporte", t.id, "mensajes"), { de: "usuario", texto, ts: serverTimestamp() });
                 ticketId = t.id; store.set("vipdrive_ticket", ticketId); $("sup-text").value = ""; listenTicket(); supShow();
             } catch (e) { console.error(e); alert("No se pudo enviar. Intenta de nuevo.") } finally { $("sup-create").disabled = false }
@@ -667,6 +681,17 @@
         const supHints = { "Quiero ser conductor de VIPDRIVE": "Cuéntanos: nombre completo, auto (marca, modelo y año), placas y si cuentas con licencia vigente.", "Quiero facturar un viaje": "Escribe tu RFC, razón social, régimen fiscal, código postal, correo, uso de CFDI y la fecha y destino del viaje." };
         $("sup-type").addEventListener("change", () => { $("sup-text").placeholder = supHints[$("sup-type").value] || "Describe lo que pasó" });
         $("sup-text").placeholder = supHints[$("sup-type").value] || "Describe lo que pasó";
+        // Zonas con tarifa aumentada (las define el admin) y evidencia del viaje para quejas de soporte
+        $("fare").insertAdjacentHTML("afterend", '<p id="surge-note" class="hidden text-[10px] font-bold text-[#8A6A00] leading-tight">📈 Tarifa aumentada por demanda</p>');
+        onSnapshot(collection(db, "zonas"), snap => { zones = snap.docs.map(d => d.data()); if (destLat !== null && routeKm > 0) { $("fare").textContent = "$" + fareTotal() } surgeNote(); setButton() }, e => console.error(e));
+        async function rideEvidence(id) {
+            if (!id) return null;
+            try {
+                const s = await getDoc(doc(db, "viajes", id)); if (!s.exists()) return null; const v = s.data(), ms = z => z?.toMillis?.() || null; let ch = drivers.get(v.chofer_solicitado) || {};
+                if (!ch.nombre && v.chofer_solicitado) { try { const cs = await getDoc(doc(db, "choferes", v.chofer_solicitado)); if (cs.exists()) ch = cs.data() } catch { } }
+                return { chofer_id: v.chofer_solicitado || "", chofer_nombre: v.chofer_nombre || ch.nombre || "", vehiculo: [ch.auto, ch.placas].filter(Boolean).join(" · "), viaje: id, cliente: v.cliente || "", telefono: v.telefono || "", origen: v.origen || "", destino: v.destino || "", tarifa: Number(v.tarifa_final || 0) + Number(v.tarifa_espera || 0), metodo_pago: v.metodo_pago || "efectivo", estado_viaje: v.estado || "", pickup: v.lat != null ? { lat: v.lat, lng: v.lng } : null, t_acepto: ms(v.chofer_acepto), t_llegada: v.llegada_ms || null, aire_acepto: v.aire_acepto ?? null, aire_inicio: v.aire_inicio ?? null, aire_actual: v.aire_actual ?? null, aire_conductor_ahora: typeof ch.aire === "boolean" ? ch.aire : null };
+            } catch (e) { console.error(e); return null }
+        }
         // Volver a solicitar: regresa a la pantalla de inicio conservando destino, paradas, recogida y pago del viaje anterior
         function backToStart() {
             chatOff(); store.set("vipdrive_active_ride", ""); unsubscribeRide?.(); unsubscribeRide = null; rideId = null; rideCancelled = false; requestBusy = false; selectedDriver = null; arrivedNotified = false; $("selected-driver-label").textContent = "";
@@ -693,7 +718,8 @@
         function openProfile(id) {
             const d = drivers.get(id); if (!d) return; profileId = id; const fk = d.fotosDoc || id; paintPhotos(d, photoCache.get(fk) || photosOf(d));
             if (!photoCache.has(fk)) { $("pf-count").textContent = "Cargando fotos…"; getDoc(doc(db, "fotos_choferes", fk)).then(s => { const f = s.exists() ? (s.data().fotos || []).filter(Boolean) : []; if (f.length) photoCache.set(fk, f); if (profileId === id) paintPhotos(d, f.length ? f : photosOf(d)) }).catch(() => { if (profileId === id) paintPhotos(d, photosOf(d)) }) }
-            $("pf-name").textContent = d.nombre || "Conductor"; $("pf-car").textContent = (d.auto || "Vehículo registrado") + (d.rating_count ? ` · ★ ${(d.rating_sum / d.rating_count).toFixed(1)} (${d.rating_count})` : ""); $("pf-plate").textContent = d.placas || "—";
+            $("pf-name").textContent = d.nombre || "Conductor";
+            { const ac = $("pf-aire"), has = typeof d.aire === "boolean"; ac.classList.toggle("hidden", !has); if (has) { ac.textContent = d.aire ? "❄️ Aire acondicionado encendido" : "🌡️ Aire acondicionado apagado"; ac.className = "inline-block mt-2 rounded-full px-3 py-1 text-xs font-bold " + (d.aire ? "bg-[#0B0B0D] text-[#D4AF37]" : "bg-gray-100 text-gray-600") } } $("pf-car").textContent = (d.auto || "Vehículo registrado") + (d.rating_count ? ` · ★ ${(d.rating_sum / d.rating_count).toFixed(1)} (${d.rating_count})` : ""); $("pf-plate").textContent = d.placas || "—";
             $("pf-dist").textContent = Number.isFinite(d.lat) ? distanceKm(myLat, myLng, d.lat, d.lng).toFixed(1) + " km" : "—";
             $("pf-select").classList.toggle("hidden", !!rideId); $("pf-select").textContent = selectedDriver?.id === id ? "Quitar selección" : `Enviar mi viaje a ${(d.nombre || "este conductor").split(" ")[0]}`;
             $("profile").classList.remove("hidden");
