@@ -13,7 +13,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="vipdrive.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 
 <body class="vd-admin text-white p-4 max-w-md mx-auto">
@@ -26,11 +28,12 @@
     <input id="pass" type="password" autocomplete="off" aria-label="Contraseña de administrador" placeholder="Contraseña de administrador"
         class="w-full mt-4 p-3 rounded-xl bg-zinc-900 border border-white/10 focus:border-[#D4AF37] outline-none text-base">
 
-    <div id="tabs" class="hidden mt-4 grid grid-cols-4 gap-1 p-1 rounded-2xl bg-zinc-900 text-xs font-bold">
+    <div id="tabs" class="hidden mt-4 grid grid-cols-5 gap-1 p-1 rounded-2xl bg-zinc-900 text-xs font-bold">
         <button type="button" data-tab="choferes" class="py-2 rounded-xl">Choferes</button>
-        <button type="button" data-tab="coment" class="py-2 rounded-xl">Comentarios</button>
+        <button type="button" data-tab="coment" class="py-2 rounded-xl">Opiniones</button>
         <button type="button" data-tab="soporte" class="py-2 rounded-xl">Soporte<span id="sop-badge" class="hidden ml-1 rounded-full bg-red-500 text-white text-[10px] px-1.5"></span></button>
         <button type="button" data-tab="pen" class="py-2 rounded-xl">Multas<span id="pen-badge" class="hidden ml-1 rounded-full bg-red-500 text-white text-[10px] px-1.5"></span></button>
+        <button type="button" data-tab="zonas" class="py-2 rounded-xl">Zonas</button>
     </div>
 
     <div id="form" class="hidden mt-4 bg-zinc-900/80 border border-white/10 rounded-2xl p-4 space-y-2">
@@ -83,6 +86,21 @@
         <p class="text-[11px] text-gray-500 mt-3">Penalización de $20 por no presentarse o cancelar tarde. El pasajero no puede pedir viajes desde ese dispositivo o número hasta que la marques como pagada.</p>
     </section>
 
+    <section id="view-zonas" class="hidden mt-4">
+        <p class="text-xs text-gray-400">Define zonas con tarifa aumentada por demanda. Toca el mapa para colocar el centro. Se aplica a los viajes cuyo punto de recogida esté dentro de la zona. El pasajero solo ve "tarifa aumentada por demanda"; el conductor ve el porcentaje.</p>
+        <div id="zmap" class="mt-2 h-[300px] rounded-2xl overflow-hidden border border-white/10"></div>
+        <div class="mt-3 bg-zinc-900/80 border border-white/10 rounded-2xl p-3 space-y-2">
+            <p id="z-title" class="font-extrabold text-sm">Nueva zona</p>
+            <input id="z-nombre" class="vd-in" placeholder="Nombre de la zona. Ej: Zona Dorada" aria-label="Nombre de la zona" autocomplete="off">
+            <label class="block text-xs text-gray-400" for="z-radio">Radio: <b id="z-radio-txt">800 m</b></label>
+            <input id="z-radio" type="range" min="200" max="5000" step="100" value="800" class="w-full accent-[#D4AF37]">
+            <label class="block text-xs text-gray-400" for="z-pct">Aumento de tarifa (%)</label>
+            <input id="z-pct" type="number" inputmode="numeric" min="1" max="300" step="1" value="20" class="vd-in">
+            <div class="flex gap-2"><button id="z-save" type="button" class="flex-1 rounded-xl py-3 font-extrabold text-black" style="background:var(--gold-grad)">GUARDAR ZONA</button><button id="z-cancel" type="button" class="hidden rounded-xl border border-white/20 px-4 text-sm">Cancelar</button></div>
+        </div>
+        <div id="z-list" class="mt-3 space-y-2"></div>
+    </section>
+
     <nav class="vd-nav mt-6" aria-label="Secciones de VIPDRIVE">
         <a href="index.html">Pedir viaje</a>
         <a href="chofer.html">Soy conductor</a>
@@ -107,7 +125,7 @@
 
         function showTab(t) {
             document.querySelectorAll("[data-tab]").forEach(b => { const on = b.dataset.tab === t; b.classList.toggle("bg-[#D4AF37]", on); b.classList.toggle("text-black", on); b.classList.toggle("text-gray-300", !on) });
-            ["form", "registrados"].forEach(k => $(k).classList.toggle("hidden", t !== "choferes")); $("view-coment").classList.toggle("hidden", t !== "coment"); $("view-soporte").classList.toggle("hidden", t !== "soporte"); $("view-pen").classList.toggle("hidden", t !== "pen");
+            ["form", "registrados"].forEach(k => $(k).classList.toggle("hidden", t !== "choferes")); $("view-coment").classList.toggle("hidden", t !== "coment"); $("view-soporte").classList.toggle("hidden", t !== "soporte"); $("view-pen").classList.toggle("hidden", t !== "pen"); $("view-zonas").classList.toggle("hidden", t !== "zonas"); if (t === "zonas") setTimeout(initZmap, 60);
         }
         $("tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) showTab(b.dataset.tab) });
         $("pass").oninput = e => { if (e.target.value === "vip2026") { $("tabs").classList.remove("hidden"); showTab("choferes"); } };
@@ -275,7 +293,7 @@
         const hav = (a, b) => { if (!a || !b) return null; const r = x => x * Math.PI / 180, dLa = r(b.lat - a.lat), dLo = r(b.lng - a.lng), h = Math.sin(dLa / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLo / 2) ** 2; return Math.round(2 * 6371000 * Math.asin(Math.sqrt(h))) };
         function evidenceHtml(p, open) {
             const e = p.ev; if (!e) return '<p class="text-[11px] text-gray-500 mt-2">Sin evidencia detallada (registro anterior).</p>';
-            const wait = e.t_llegada && e.t_cancel ? (e.t_cancel - e.t_llegada) / 1000 : null, since = e.t_acepto && e.t_cancel ? (e.t_cancel - e.t_acepto) / 1000 : null, moved = hav(e.acept_pos, e.cancel_pos);
+            const aireLbl = v => v === true ? "Encendido" : v === false ? "Apagado" : "sin dato"; const wait = e.t_llegada && e.t_cancel ? (e.t_cancel - e.t_llegada) / 1000 : null, since = e.t_acepto && e.t_cancel ? (e.t_cancel - e.t_acepto) / 1000 : null, moved = hav(e.acept_pos, e.cancel_pos);
             const chk = (c, txt) => `<li class="${c === null ? "text-gray-400" : c ? "text-green-400" : "text-red-300"}">${c === null ? "• " : c ? "✓ " : "✗ "}${txt}</li>`, checks = [];
             if (p.motivo === "no_show" || (p.ev.quien === "chofer" && !p.ev.motivo_no_pago)) checks.push(chk(wait === null ? null : wait >= 300, `Esperó 5 min o más después de "Ya llegué" (${wait === null ? "sin dato" : durS(wait)})`), chk(e.llegada_pos?.d == null ? null : e.llegada_pos.d <= 50, `Marcó llegada a 50 m o menos del punto (${e.llegada_pos?.d ?? "sin dato"} m)`), chk(e.cancel_pos?.d == null ? null : e.cancel_pos.d <= 150, `Seguía cerca del punto al cancelar (${e.cancel_pos?.d ?? "sin dato"} m)`));
             if (p.motivo === "cancelacion_tardia") checks.push(chk(since === null ? null : since >= 300, `Pasaron 5 min o más desde que el chofer aceptó (${since === null ? "sin dato" : durS(since)})`), chk(e.t_llegada ? true : moved === null ? null : moved >= 100, e.t_llegada ? "El chofer ya había llegado al punto" : `El chofer se movió hacia el punto (${moved ?? "sin dato"} m desde que aceptó)`));
@@ -284,9 +302,10 @@
 <p><b>Chofer:</b> ${esc(e.chofer_nombre || "—")} · usuario ${esc(e.chofer_id || "—")} · ${esc(e.vehiculo || "sin vehículo")}</p>
 <p><b>Pasajero:</b> ${esc(e.cliente || "—")} · ${esc(e.telefono || "—")}</p>
 <p><b>Viaje:</b> ${esc(e.viaje || "—")} · $${esc(e.tarifa ?? "—")} · ${esc(e.metodo_pago || "")}</p>
+<p><b>❄️ Aire acondicionado:</b> al aceptar: ${aireLbl(e.aire_acepto)} · al iniciar: ${aireLbl(e.aire_inicio)} · durante el viaje o al cancelar: ${aireLbl(e.aire_actual)}${e.aire_conductor_ahora != null ? " · ahora: " + aireLbl(e.aire_conductor_ahora) : ""}</p>
 <p><b>Recogida:</b> ${esc(e.origen || "—")} (${gmap(e.pickup)})</p><p><b>Destino:</b> ${esc(e.destino || "—")}</p>
-<p><b>Quién canceló:</b> ${e.quien === "chofer" ? "el chofer" : "el pasajero"}</p>
-<p><b>Hora en que aceptó:</b> ${fmtT(e.t_acepto)}<br><b>Hora de "Ya llegué":</b> ${fmtT(e.t_llegada)}${e.llegada_pos?.d != null ? ` (a ${esc(e.llegada_pos.d)} m del punto)` : ""}<br><b>Hora de cancelación:</b> ${fmtT(e.t_cancel)}</p>
+${p.motivo === "no_show" || p.motivo === "cancelacion_tardia" ? `<p><b>Quién canceló:</b> ${e.quien === "chofer" ? "el chofer" : "el pasajero"}</p>` : ""}
+<p><b>Hora en que aceptó:</b> ${fmtT(e.t_acepto)}<br><b>Hora de "Ya llegué":</b> ${fmtT(e.t_llegada)}${e.llegada_pos?.d != null ? ` (a ${esc(e.llegada_pos.d)} m del punto)` : ""}${e.t_cancel ? `<br><b>Hora de cancelación:</b> ${fmtT(e.t_cancel)}` : ""}</p>
 <p><b>Ubicación del chofer:</b><br>Al aceptar: ${gmap(e.acept_pos)}<br>Al avisar llegada: ${gmap(e.llegada_pos)}<br>Al cancelar o finalizar: ${gmap(e.cancel_pos)}${e.cancel_pos?.d != null ? ` (a ${esc(e.cancel_pos.d)} m del punto)` : ""}</p>
 ${e.motivo_no_pago ? `<p><b>Monto recibido:</b> $${esc(e.monto_recibido)} · <b>Adeudo:</b> $${esc(e.adeudo)}<br><b>Motivo del pasajero:</b> ${esc(e.motivo_no_pago)}</p>` : ""}
 ${checks.length ? `<ul class="space-y-0.5 pt-1">${checks.join("")}</ul>` : ""}</div></details>`;
@@ -309,6 +328,36 @@ ${p.estado === "pendiente" ? `<div class="flex gap-2 mt-3"><button type="button"
             updateDoc(doc(db, "penalizaciones", id), pay ? { estado: "pagada", pagado: serverTimestamp() } : { estado: "anulada", anulado: serverTimestamp() }).catch(err => { console.error(err); alert("No se pudo actualizar.") });
         });
         onSnapshot(query(collection(db, "penalizaciones"), orderBy("creado", "desc"), limit(100)), snap => { pens = snap.docs.map(d => ({ id: d.id, ...d.data() })); paintPens() }, e => console.error(e));
+        // ---- Zonas con tarifa aumentada por demanda
+        let zmap = null, zones = [], zLayers = [], zDraft = null, zCircle = null, zEditId = null;
+        function initZmap() {
+            if (zmap) { zmap.invalidateSize(); return }
+            zmap = L.map("zmap").setView([23.2329, -106.4111], 12); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(zmap);
+            zmap.on("click", e => { zDraft = { lat: e.latlng.lat, lng: e.latlng.lng }; drawDraft() }); paintZones();
+        }
+        function drawDraft() { zCircle?.remove(); zCircle = null; if (zDraft && zmap) zCircle = L.circle([zDraft.lat, zDraft.lng], { radius: Number($("z-radio").value), color: "#B8860B", dashArray: "6", fillColor: "#D4AF37", fillOpacity: .3 }).addTo(zmap) }
+        $("z-radio").addEventListener("input", () => { $("z-radio-txt").textContent = $("z-radio").value + " m"; drawDraft() });
+        function resetZ() { zEditId = null; zDraft = null; zCircle?.remove(); zCircle = null; $("z-nombre").value = ""; $("z-radio").value = 800; $("z-radio-txt").textContent = "800 m"; $("z-pct").value = 20; $("z-title").textContent = "Nueva zona"; $("z-save").textContent = "GUARDAR ZONA"; $("z-cancel").classList.add("hidden") }
+        function paintZones() {
+            if (zmap) { zLayers.forEach(l => l.remove()); zLayers = zones.map(z => L.circle([z.lat, z.lng], { radius: z.radio_m, color: z.activa === false ? "#777" : "#B8860B", fillColor: z.activa === false ? "#777" : "#D4AF37", fillOpacity: .2, weight: 2 }).bindTooltip(`${z.nombre} · +${z.porcentaje}%`).addTo(zmap)) }
+            $("z-list").innerHTML = zones.length ? zones.map(z => `<div class="rounded-2xl bg-black/40 border border-white/10 p-3"><div class="flex justify-between gap-2"><b class="text-sm">${esc(z.nombre)}</b><b class="text-[#D4AF37]">+${esc(z.porcentaje)}%</b></div>
+<p class="text-xs text-gray-400">Radio ${esc(z.radio_m)} m · ${z.activa === false ? "Desactivada" : "Activa"}</p>
+<div class="flex gap-2 mt-2"><button type="button" data-z-toggle="${esc(z.id)}" class="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-bold">${z.activa === false ? "Activar" : "Desactivar"}</button><button type="button" data-z-edit="${esc(z.id)}" class="rounded-lg bg-[#D4AF37]/25 px-3 py-1.5 text-xs font-bold text-[#F0D78C]">Editar</button><button type="button" data-z-del="${esc(z.id)}" class="rounded-lg border border-red-400/50 px-3 py-1.5 text-xs text-red-300">Eliminar</button></div></div>`).join("") : '<p class="text-xs text-gray-400 bg-zinc-900/80 rounded-xl p-3">Aún no hay zonas.</p>';
+        }
+        $("z-save").onclick = async () => {
+            const nombre = $("z-nombre").value.trim(), pct = Number($("z-pct").value), radio = Number($("z-radio").value);
+            if (!zDraft) return alert("Toca el mapa para elegir el centro de la zona."); if (!nombre) return alert("Escribe un nombre para la zona."); if (!(pct > 0 && pct <= 300)) return alert("El aumento debe estar entre 1% y 300%.");
+            const data = { nombre, lat: zDraft.lat, lng: zDraft.lng, radio_m: radio, porcentaje: pct };
+            try { if (zEditId) await updateDoc(doc(db, "zonas", zEditId), data); else await addDoc(collection(db, "zonas"), { ...data, activa: true, creado: serverTimestamp() }); resetZ() } catch (e) { console.error(e); alert("No se pudo guardar la zona.") }
+        };
+        $("z-cancel").onclick = resetZ;
+        $("z-list").addEventListener("click", e => {
+            const tg = e.target.closest("[data-z-toggle]"), ed = e.target.closest("[data-z-edit]"), dl = e.target.closest("[data-z-del]");
+            if (tg) { const z = zones.find(x => x.id === tg.dataset.zToggle); if (z) updateDoc(doc(db, "zonas", z.id), { activa: z.activa === false }).catch(console.error) }
+            if (dl && confirm("¿Eliminar esta zona?")) deleteDoc(doc(db, "zonas", dl.dataset.zDel)).catch(console.error);
+            if (ed) { const z = zones.find(x => x.id === ed.dataset.zEdit); if (!z) return; zEditId = z.id; zDraft = { lat: z.lat, lng: z.lng }; $("z-nombre").value = z.nombre; $("z-radio").value = z.radio_m; $("z-radio-txt").textContent = z.radio_m + " m"; $("z-pct").value = z.porcentaje; $("z-title").textContent = "Editando zona"; $("z-save").textContent = "GUARDAR CAMBIOS"; $("z-cancel").classList.remove("hidden"); drawDraft(); zmap?.setView([z.lat, z.lng], 14) }
+        });
+        onSnapshot(collection(db, "zonas"), snap => { zones = snap.docs.map(d => ({ id: d.id, ...d.data() })); paintZones() }, e => console.error(e));
         resetForm();
     </script>
 </body>
